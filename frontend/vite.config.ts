@@ -17,9 +17,9 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
-      // Proxy JupyterLab requests to the Nginx ingress (port-forwarded to 8081)
+      // Proxy JupyterLab requests to the Nginx ingress via kind extraPortMappings (port 80)
       '/jupyter': {
-        target: 'http://platform.internal:8081',
+        target: 'http://platform.internal:80',
         changeOrigin: true,
         ws: true,
       },

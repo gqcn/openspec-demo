@@ -1,6 +1,7 @@
 ## 人工测试反馈的问题
 
 
+### test1
 1. 登录失败时页面报错：Cannot read properties of undefined (reading 'token')
 2. 缺少对登录失败的边界测试情况覆盖。
 3. 添加规格成功后，无法查询到新添加的规格。
@@ -13,5 +14,9 @@
 
 
 
+
+### test2
+1. 进入开发机失败，报500错误
+2. 开发机进入的URL多出了token的query参数，应该要去掉。比如：http://localhost:3002/jupyter/1vn7xwe1ceodgutdtfof1a040099tid9/lab?token=1vn7xwe1ceodgutdtfof1a040099tid9 应当改为 http://localhost:3002/jupyter/1vn7xwe1ceodgutdtfof1a040099tid9/lab
 
 

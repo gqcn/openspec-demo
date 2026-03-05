@@ -47,6 +47,18 @@ kubectl wait --namespace ingress-nginx \
   --timeout=90s
 echo "✅ nginx Ingress Controller 就绪"
 
+# 将 ingress-nginx-controller 固定到 control-plane 节点
+# kind 的 extraPortMappings（80/443→localhost）只在 control-plane 节点上生效，
+# 必须确保 ingress pod 调度到该节点，否则 hostPort 无法映射到 macOS host 端口。
+echo "📌 将 ingress-nginx-controller 固定到 control-plane 节点..."
+kubectl -n ingress-nginx patch deployment ingress-nginx-controller --type=json -p='[
+  {"op":"add","path":"/spec/template/spec/nodeSelector/kubernetes.io~1hostname","value":"kind-cluster-control-plane"},
+  {"op":"add","path":"/spec/template/spec/tolerations","value":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}
+]'
+echo "⏳ 等待 ingress-nginx 重新调度到 control-plane..."
+kubectl rollout status -n ingress-nginx deployment/ingress-nginx-controller --timeout=120s
+echo "✅ ingress-nginx 已固定到 control-plane，可通过 http://platform.internal 直接访问"
+
 # -------------------------------------------------------
 # Step 3: 创建 namespace
 # -------------------------------------------------------

@@ -97,9 +97,10 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 						{Name: "NB_UID", Value: fmt.Sprintf("%d", opts.Uid)},
 						{Name: "NB_GID", Value: fmt.Sprintf("%d", opts.Uid)},
 						{Name: "NB_USER", Value: opts.Username},
-						{Name: "JUPYTER_TOKEN", Value: opts.Token},
-						// Pass ServerApp.base_url via NOTEBOOK_ARGS (correct for JupyterLab 4.x)
-						{Name: "NOTEBOOK_ARGS", Value: fmt.Sprintf("--ServerApp.base_url=%s", baseURL)},
+						// Disable token auth: routing token in URL path is the security boundary.
+						// Pass ServerApp.base_url and disable token/password via NOTEBOOK_ARGS.
+						// allow_origin='*' permits cross-origin API requests from the Vite dev proxy (localhost:3002).
+						{Name: "NOTEBOOK_ARGS", Value: fmt.Sprintf("--ServerApp.base_url=%s --ServerApp.token= --ServerApp.password='' --ServerApp.allow_origin='*'", baseURL)},
 						{Name: "CHOWN_HOME", Value: "yes"},
 						{Name: "CHOWN_HOME_OPTS", Value: "-R"},
 					},
