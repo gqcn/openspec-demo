@@ -6,7 +6,114 @@
 
 ---
 
-## 一、基础设施 & 数据库
+## 零、缺陷修复（Bug Fixes）
+
+> 本节记录事后发现并修复的问题，不改变原始需求任务编号。
+
+- [x] **BUG-1** `frontend/src/api/http.ts`：修复 Axios 响应拦截器未检查 GoFrame 错误码  
+  - 根因：GoFrame 所有错误以 HTTP 200 + `{ code: X, message: "...", data: null }` 返回，原拦截器无 code 检查，导致错误响应被视为成功  
+  - 影响：登录失败崩溃（`Cannot read properties of undefined (reading 'token')`）、规格创建/修改静默失败  
+  - 修复：在 success interceptor 中加入 `if (response.data?.code !== 0) return Promise.reject(response.data)` 判断
+
+- [x] **BUG-2** `backend/internal/service/spec/spec.go`：`Update` 未加 `OmitEmpty()` 导致字段被清空  
+  - 根因：`do.Spec` 所有字段为 `interface{}`；前端仅传 name/cpu/memory/gpu/gpuType 时，NodeSelector/Tolerations/Description 默认为空字符串（非 nil），ORM 会将其写入 DB，清除原有配置  
+  - 修复：`dao.Specs.Ctx(ctx).Where("id", id).Data(in).OmitEmpty().Update()`
+
+- [x] **BUG-3** `backend/internal/controller/spec/spec_v1_handlers.go`：`GET /api/spec` 始终过滤 enabled=1，管理员无法在规格管理页看到禁用规格  
+  - 修复：在 List handler 中读取 JWT 上下文用户，管理员调用 `svcSpec.ListAll(ctx)`，普通用户调用 `svcSpec.List(ctx)`
+
+- [x] **BUG-4** `frontend/src/views/NotebookListView.vue`：创建开发机按钮无禁用状态，有活跃实例时仍可点击  
+  - 修复：添加 `hasActiveNotebook` computed（检测 creating/running/stopping 状态），对创建按钮添加 `:disabled="hasActiveNotebook"` 及 Tooltip 提示
+
+- [x] **BUG-5** `frontend/src/views/NotebookListView.vue`：已停止/异常实例无删除记录按钮，旧记录无法手动清理  
+  - 修复：为 stopped/failed 实例添加"删除记录"按钮（调用 `DELETE /api/notebook/{id}`）；后端 `Delete` 对已停止实例直接物理删除 DB 行
+
+- [x] **BUG-6** `backend/internal/service/notebook/notebook.go`：创建新实例前不清理旧的 stopped/failed 记录，导致每次创建都留下历史条目  
+  - 修复：在 `Create()` 的活跃实例检查通过后，自动删除该用户所有 stopped/failed 记录，保持列表整洁
+
+- [x] **BUG-7** `backend/internal/service/spec/spec.go`：`Create` 未加 `OmitEmpty()`，JSON 列写入空字符串  
+  - 根因：`node_selector` / `tolerations` 定义为 `JSON DEFAULT NULL`；未传时 `do.Spec` 对应字段为 `""`（空字符串），MySQL JSON 列不接受空字符串，报 Error 3140  
+  - 修复：`dao.Specs.Ctx(ctx).Data(in).OmitEmpty().Insert()`（Update 在 BUG-2 时已修复）
+
+- [x] **BUG-8** `backend/internal/service/user/user.go`：`Create` 未在 INSERT 中包含 `uid`，触发 NOT NULL 约束  
+  - 根因：`users.uid INT UNSIGNED NOT NULL` 无 DEFAULT 值；原 Insert 省略 `uid` 字段导致 MySQL Error 1364  
+  - 修复：INSERT 时先存入 `Uid: uint(0)` 占位（满足 NOT NULL），成功后 `UPDATE SET uid = 10000 + id`；同时修复 Update 改用 `g.Map{"uid": uid}` 避免全字段覆盖
+
+- [x] **BUG-9** `backend/internal/service/middleware/middleware.go`：`WriteStatus(200/401/403)` 向响应 Body 写入状态文本前缀  
+  - 根因：GoFrame `r.Response.WriteStatus(code)` 在无第二参数时将 HTTP 状态文本（"OK"/"Unauthorized"/"Forbidden"）写入 Body Buffer，`WriteJson` 追加 JSON 后 Body 变为 `OK{...}`，前端 `JSON.parse` 报 SyntaxError  
+  - 修复：移除所有 `WriteStatus` 调用；Auth/AdminOnly 中间件直接使用 `WriteJson` 输出错误体
+
+- [x] **BUG-10** `backend/internal/service/middleware/middleware.go`：Auth 中间件写响应 + `HandlerResponse` 再次包装，导致 Body 中出现双份 JSON  
+  - 根因：Auth 写完响应后调用 `r.ExitAll()`，但 `HandlerResponse` 的 `r.Middleware.Next()` 返回后仍继续执行并追加第二份 JSON  
+  - 修复：在 `HandlerResponse` 后半段（`Next()` 返回后）加入 `if len(r.Response.Buffer()) > 0 { return }` 检查，若已有内容则跳过包装
+
+---
+
+## QA 测试脚本修复记录（e2e-test.sh）
+
+> 以下记录测试脚本本身的缺陷，与产品功能无关，均已修复。
+
+- [x] **QA-TS-1** `get_result()` 未过滤 `\r`，Windows CRLF 残留导致字符串比对失败  
+  → 修复：`tr -d '"\\r'`
+
+- [x] **QA-TS-2** GPU-标准 规格数据在多次运行间可能缺失  
+  → 修复：在 TC-2 前增加自动播种逻辑（检测后按需调 POST /api/spec 创建）
+
+- [x] **QA-TS-3** TC-4d/TC-8c：`localStorage.getItem('token')` 在 Node.js 回调上下文中不可用  
+  → 修复：将 `localStorage` 访问移入 `page.evaluate()` 内（浏览器上下文）
+
+- [x] **QA-TS-4** TC-2f/TC-2g：`getByPlaceholder('如: 4')` 部分匹配命中"如: 4C8G"（规格名称栏），Playwright 严格模式报错  
+  → 修复：添加 `{ exact: true }` 参数
+
+- [x] **QA-TS-5** TC-3d：创建用户对话框的确认按钮文本为"创建"而非"保存"  
+  → 修复：将 `getByRole('button', { name: '保存' })` 改为 `getByRole('button', { name: '创建' })`
+
+- [x] **QA-TS-6** TC-7：退出登录抽屉触发器为 `<span>`，`getByRole('button', { name: 'admin' })` 在部分状态下无法匹配  
+  → 修复：增加 `.el-header .el-dropdown` / `[tabindex="0"]` 备用选择器兜底
+
+- [x] **QA-TS-7** TC-7e/TC-8：`$WRONG_PASS_RESULT）` / `$BTN_ENABLED）` 后紧跟全角字符，bash `set -u` 将 UTF-8 首字节误解析为变量名的一部分，报 unbound variable  
+  → 修复：改用 `${WRONG_PASS_RESULT}` / `${BTN_ENABLED}` 显式括号
+
+- [x] **QA-TS-8** TC-8（停止确认）：`getByRole('button', { name: '停止', exact: true })` 在对话框打开时命中表行按钮 + 对话框确认按钮，Playwright 严格模式报 StrictModeViolationError，`catch {}` 吞掉错误导致对话框从未被确认，实例永不停止  
+  → 修复：范围限定到 `.el-message-box` 后再查找确认按钮
+
+- [x] **QA-TS-9** TC-4/TC-8（创建开发机对话框）：`[class*="select"]` 在点击规格卡片后命中 `.spec-card.selected`（"selected" 含子串 "select"），下拉框未打开，镜像未选择，创建静默失败  
+  → 修复：改用 `.el-select__wrapper` 精确定位镜像下拉触发元素
+
+- [x] **QA-TS-10** TC-8c：断言检查 `body.includes('pytorch-notebook')` 但前端镜像列展示的是 `imageName`（"PyTorch 2.2 + CUDA 12.1"）而非 Docker 镜像 URL  
+  → 修复：改为 `body.includes('pytorch-cuda121') || body.includes('PyTorch')`
+
+- [x] **QA-TS-11** TC-6：分三条独立的 `playwright-cli keydown/press/keyup` 命令触发 Shift+Enter，每次调用均重置键盘状态，实际未发出 Shift+Enter；`wait_for_text` 轮询上限 30 次不足以覆盖新 Pod 内核冷启动  
+  → 修复：合并为单一 `run-code` 中的 `page.keyboard.press('Shift+Enter')`；`wait_for_text` 轮询次数从 30 增至 60
+
+---
+
+## 设计决策说明（Design Decisions）
+
+> 以下记录实现过程中发现功能与原始设计文档不符的地方及处置决定。
+
+### DD-1：每用户一实例策略（Issue 6 & 8）
+**背景**：原设计中对"同时只能有一个实例"的约束未明确说明是否允许保留历史已停止记录，也未明确前端如何防止重复创建。  
+**决定**：
+- 后端创建检查已正确拦截 creating/running/stopping 状态（allowed to have stopped/failed records prior to fix）
+- 前端增加 `hasActiveNotebook` 计算属性，禁用创建按钮并显示 Tooltip
+- 后端 `Create()` 自动清理旧 stopped/failed 记录（保留最多 1 条活跃记录，无历史堆积）
+- 前端新增"删除记录"按钮，允许用户手动清除已停止实例的 DB 条目
+
+### DD-2：管理员规格列表可见性（Issue 3）
+**背景**：原设计 `GET /api/spec` 文档写的是返回 enabled=1 的规格，但管理员在规格管理页面需要看到所有规格（含禁用）以便操作。  
+**决定**：同一接口根据 JWT 身份动态切换返回策略  
+- 管理员 → 返回所有规格（`ListAll`）
+- 普通用户 → 仅返回启用的规格（`List`，用于创建开发机选择）
+- 创建开发机弹窗客户端侧仍额外过滤 `enabled === 1`，防止管理员无意选择已禁用规格
+
+### DD-3：HTTP 响应统一错误处理（Issue 1 & 3 & 4）
+**背景**：GoFrame 的约定是所有错误以 HTTP 200 + `{ code: X }` 返回，而非 HTTP 4xx。原 Axios 拦截器只处理 HTTP 状态码，导致业务错误被当作成功处理。  
+**决定**：在 Axios success 拦截器中统一检查 `response.data.code`，非 0 时 `Promise.reject`，让各页面的 catch 块正确显示错误信息。
+
+---
+
+
 
 - [ ] **INFRA-1** 创建 K8S namespace `jupyter`
 - [ ] **INFRA-2** 部署 NFS StorageClass，创建共享 PVC `pvc-jupyter-shared`（RWX）
@@ -146,6 +253,13 @@
   - 在 JupyterLab 中新建 Python 3 Notebook，执行梯度下降线性回归训练  
   - 验证：训练收敛（w≈2.0，b≈0.0），无 AssertionError/Traceback 输出
   - 验证：输出 `TRAINING_TEST_PASSED`
+- [x] **QA-9** [NEW] Bug 修复验证
+  - 登录失败边界：输入错误密码 → 显示错误提示，页面不崩溃，留在登录页
+  - 规格 CRUD：创建新规格后出现在管理列表，修改 CPU 后正确持久化
+  - 用户 CRUD：创建新用户后出现在用户列表，禁用后状态变为禁用
+  - 重复创建防护：有活跃实例时创建按钮禁用；API 返回错误码（非 0）
+  - 不同镜像创建：选择 PyTorch 镜像创建开发机，实例列表显示正确镜像
+  - 停止后清理：停止实例后"删除记录"按钮出现，删除后列表清空，创建按钮恢复可用
 - [ ] **QA-3** 多用户权限隔离验证：用户 A 无法访问用户 B 的 `/home/jovyan`
 - [ ] **QA-4** `/share` 目录读写验证：多用户互相可读写
 - [ ] **QA-5** WebSocket 稳定性验证：JupyterLab kernel 通信、Terminal 长时间连接不断开
@@ -182,10 +296,23 @@
 | TC-6c | 梯度下降收敛 | QA-8 | 输出包含 Trained: 行（断言通过即 w≈2.0） |
 | TC-7a | 退出登录跳转 /login | QA-1 | URL 变为 /login |
 | TC-7b | 退出成功提示 | QA-1 | 页面含“已退出登录” |
-| TC-7c | 登录表单可见 | QA-1 | 登录按鈕文字可见（登 录） |
+| TC-7c | 登录表单可见 | QA-1 | 登录按钮文字可见（登 录） |
 | TC-7d | 未登录访问保护路由重定向 | QA-1 | /notebooks → /login |
+| TC-7e | 错误密码登录后留在登录页 | QA-9 | URL 保持 /login，不崩溃 |
+| TC-7f | 错误密码显示错误提示 | QA-9 | Element Plus error toast 出现 |
+| TC-2f | 创建规格后出现在列表 | QA-9 | 新规格 Test-CPU-E2E 在列表可见 |
+| TC-2g | 修改规格 CPU 后更新成功 | QA-9 | 修改后 1000m 可见 |
+| TC-3d | 创建新用户后出现在列表 | QA-9 | testuser01 在用户列表可见 |
+| TC-3e | 禁用用户后状态变更 | QA-9 | testuser01 状态变为禁用 |
+| TC-4c | 有活跃实例时创建按钮禁用 | QA-9 | el-button disabled 属性为 true |
+| TC-4d | API 拒绝重复创建开发机 | QA-9 | 后端返回非 0 code |
+| TC-8a | 停止后删除记录按钮有效 | QA-9 | 已停止实例可通过删除记录按钮清除 |
+| TC-8b | 清除记录后创建按钮可用 | QA-9 | 按钮 disabled 为 false |
+| TC-8c | PyTorch 镜像创建正确 | QA-9 | 列表镜像列显示 'PyTorch' 或 'pytorch-cuda121' |
+| TC-8d | PyTorch 开发机进入创建流程 | QA-9 | 状态为创建中或运行中 |
 
-> 最终执行结果（2026-03-05）：**PASS=24 FAIL=0** — 全郡 24 个测试用例全部通过 ✅
+> 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅  
+> （初版：PASS=24；后续 Bug 修复后新增 TC-7e/TC-7f、TC-2f/TC-2g、TC-3d/TC-3e、TC-4c/TC-4d、TC-8a~TC-8d 共 12 个，合计 36 个）
 
 
 

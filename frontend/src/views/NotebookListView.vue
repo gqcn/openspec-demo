@@ -12,6 +12,11 @@ const notebooks = ref<Instance[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
 
+// True when the current user already has a creating/running/stopping instance.
+const hasActiveNotebook = computed(() =>
+  notebooks.value.some((n) => ['creating', 'running', 'stopping'].includes(n.status))
+)
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const statusMap: Record<string, { label: string; type: string }> = {
@@ -76,15 +81,29 @@ async function handleRestart(nb: Instance) {
 }
 
 async function handleDelete(nb: Instance) {
-  await ElMessageBox.confirm(`确认停止并删除开发机 "${nb.username}" 吗？`, '删除确认', {
+  await ElMessageBox.confirm(`确认停止开发机 "${nb.username}" 吗？`, '停止确认', {
+    type: 'warning',
+    confirmButtonText: '停止',
+  })
+  try {
+    await deleteNotebook(nb.id)
+    ElMessage.success('已停止')
+    await fetchList()
+    watchPolling()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+  }
+}
+
+async function handlePurge(nb: Instance) {
+  await ElMessageBox.confirm(`确认删除记录 "${nb.username}" 吗？此操作不可撤销。`, '删除记录', {
     type: 'error',
     confirmButtonText: '删除',
   })
   try {
     await deleteNotebook(nb.id)
-    ElMessage.success('已删除')
+    ElMessage.success('记录已删除')
     await fetchList()
-    watchPolling()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
   }
@@ -107,7 +126,18 @@ onUnmounted(() => stopPoll())
   <div>
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px">
       <h2 style="margin: 0; font-size: 20px; color: #303133">我的开发机</h2>
-      <el-button type="primary" :icon="'Plus'" @click="showCreate = true">创建开发机</el-button>
+      <el-tooltip
+        :disabled="!hasActiveNotebook"
+        content="您已有运行中的开发机，请先停止后再创建"
+        placement="left"
+      >
+        <el-button
+          type="primary"
+          :icon="'Plus'"
+          :disabled="hasActiveNotebook"
+          @click="showCreate = true"
+        >创建开发机</el-button>
+      </el-tooltip>
     </div>
 
     <el-table :data="notebooks" v-loading="loading" border stripe>
@@ -146,13 +176,22 @@ onUnmounted(() => stopPoll())
             重启
           </el-button>
           <el-button
-            v-if="row.status !== 'stopped' && row.status !== 'stopping'"
+            v-if="row.status !== 'stopped' && row.status !== 'stopping' && row.status !== 'failed'"
             type="danger"
             size="small"
             link
             @click="handleDelete(row)"
           >
             停止
+          </el-button>
+          <el-button
+            v-if="row.status === 'stopped' || row.status === 'failed'"
+            type="danger"
+            size="small"
+            link
+            @click="handlePurge(row)"
+          >
+            删除记录
           </el-button>
         </template>
       </el-table-column>

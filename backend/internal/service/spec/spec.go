@@ -37,7 +37,7 @@ func GetById(ctx context.Context, id uint) (spec *entity.Spec, err error) {
 
 // Create inserts a new spec record.
 func Create(ctx context.Context, in *do.Spec) (id uint, err error) {
-	res, err := dao.Specs.Ctx(ctx).Data(in).Insert()
+	res, err := dao.Specs.Ctx(ctx).Data(in).OmitEmpty().Insert()
 	if err != nil {
 		return 0, err
 	}
@@ -47,7 +47,7 @@ func Create(ctx context.Context, in *do.Spec) (id uint, err error) {
 
 // Update modifies a spec record.
 func Update(ctx context.Context, id uint, in *do.Spec) error {
-	_, err := dao.Specs.Ctx(ctx).Where("id", id).Data(in).Update()
+	_, err := dao.Specs.Ctx(ctx).Where("id", id).Data(in).OmitEmpty().Update()
 	return err
 }
 

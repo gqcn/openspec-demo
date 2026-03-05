@@ -60,6 +60,12 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 		return nil, gerror.NewCode(gcode.CodeBusinessValidationFailed, "您已有活跃的开发机实例，请先停止后再创建")
 	}
 
+	// 1b. Clean up stale stopped/failed records for this user before creating a new one.
+	_, _ = dao.Instances.Ctx(ctx).
+		Where("user_id", userId).
+		WhereIn("status", []string{consts.StatusStopped, consts.StatusFailed}).
+		Delete()
+
 	// 2. Validate spec
 	sp, err := spec.GetById(ctx, specId)
 	if err != nil {
@@ -165,6 +171,12 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
 	ins, err := GetById(ctx, id, userId, isAdmin)
 	if err != nil {
+		return err
+	}
+
+	// For already-stopped or failed instances, just remove the DB record (K8S resources are already gone).
+	if ins.Status == consts.StatusStopped || ins.Status == consts.StatusFailed {
+		_, err = dao.Instances.Ctx(ctx).Where("id", id).Delete()
 		return err
 	}
 

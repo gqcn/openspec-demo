@@ -16,7 +16,14 @@ http.interceptors.request.use((config) => {
 })
 
 http.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // GoFrame returns errors as HTTP 200 with non-zero code field.
+    // Reject so callers can catch(e) with e.message populated.
+    if (response.data?.code !== undefined && response.data.code !== 0) {
+      return Promise.reject(response.data)
+    }
+    return response.data
+  },
   (error) => {
     if (error.response?.status === 401) {
       const auth = useAuthStore()

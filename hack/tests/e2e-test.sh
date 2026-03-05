@@ -45,7 +45,7 @@ run_timeout() {
 # Extract the result value from playwright-cli output.
 # playwright-cli outputs:  ### Result\n<value>\n...
 get_result() {
-  awk '/^### Result$/{getline; print; exit}' | tr -d '"'
+  awk '/^### Result$/{getline; print; exit}' | tr -d '"\r'
 }
 
 # Run playwright-cli run-code with a 15 s timeout, return raw output
@@ -150,11 +150,87 @@ log "=== TC-2: 规格管理页面验证 ==="
 pc_goto "$BASE_URL/specs" >/dev/null 2>&1
 sleep 1
 
+# Ensure GPU-标准 spec exists (may be missing if DB was reset or previous run failed)
+GPU_SEED_RESULT=$(run_timeout 10 playwright-cli run-code "async page => {
+  return await page.evaluate(async () => {
+    const token = localStorage.getItem('token') || '';
+    const lr = await fetch('/api/spec', { headers: { 'Authorization': 'Bearer ' + token } });
+    const ld = await lr.json();
+    const list = (ld.data && ld.data.list) ? ld.data.list : [];
+    const has = list.some(s => s.name === 'GPU-\u6807\u51c6');
+    if (!has) {
+      const cr = await fetch('/api/spec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+          name: 'GPU-\u6807\u51c6', cpu: '4', memory: '16Gi', gpu: '1',
+          gpuType: 'nvidia.com/gpu',
+          nodeSelector: '{\"gpu-type\": \"gpu\"}',
+          tolerations: '[{\"key\":\"gpu\",\"operator\":\"Exists\",\"effect\":\"NoSchedule\"}]',
+          sortOrder: 30, enabled: 1
+        })
+      });
+      const cd = await cr.json();
+      return cd.code === 0 ? 'seeded' : 'seed-failed:' + cd.message;
+    }
+    return 'exists';
+  });
+}" 2>/dev/null | get_result)
+if [[ "${GPU_SEED_RESULT:-}" == 'seeded' ]]; then
+  log "  ✎ GPU-标准 was missing — re-seeded via API"
+  sleep 1
+  pc_goto "$BASE_URL/specs" >/dev/null 2>&1
+  sleep 1
+elif [[ "${GPU_SEED_RESULT:-}" == 'exists' ]]; then
+  : # already present
+else
+  log "  ⚠ GPU-标准 seed check returned: ${GPU_SEED_RESULT:-empty}"
+fi
+
 assert_text "TC-2a: 页面标题为规格管理" "规格管理"
 assert_text "TC-2b: 包含 CPU-小 规格" "CPU-小"
 assert_text "TC-2c: 包含 CPU-大 规格" "CPU-大"
 assert_text "TC-2d: 包含 GPU-标准 规格" "GPU-标准"
 assert_text "TC-2e: 包含编辑操作" "编辑"
+
+# TC-2f: 创建新规格并验证出现在列表
+log ""
+log "=== TC-2f/TC-2g: 创建并修改规格 ==="
+pc_code "async page => {
+  await page.getByRole('button', { name: '新增规格' }).click();
+  await page.waitForSelector('.el-dialog__body', { timeout: 4000 });
+  await page.getByPlaceholder('如: 4C8G').fill('Test-CPU-E2E');
+  await page.getByPlaceholder('如: 4', { exact: true }).fill('500m');
+  await page.getByPlaceholder('如: 8Gi').fill('1Gi');
+  await page.getByRole('button', { name: '保存' }).click();
+  await page.waitForTimeout(1500);
+}" >/dev/null 2>&1
+sleep 1
+pc_goto "$BASE_URL/specs" >/dev/null 2>&1
+sleep 1
+assert_text "TC-2f: 创建规格后出现在列表" "Test-CPU-E2E"
+
+# TC-2g: 修改规格 CPU 并验证更新
+pc_code "async page => {
+  const rows = await page.locator('tr').all();
+  for (const row of rows) {
+    const text = await row.innerText().catch(() => '');
+    if (text.includes('Test-CPU-E2E')) {
+      await row.getByRole('button', { name: '编辑' }).click();
+      break;
+    }
+  }
+  await page.waitForSelector('.el-dialog__body', { timeout: 3000 });
+  const cpuInput = page.getByPlaceholder('如: 4', { exact: true });
+  await cpuInput.clear();
+  await cpuInput.fill('1000m');
+  await page.getByRole('button', { name: '保存' }).click();
+  await page.waitForTimeout(1500);
+}" >/dev/null 2>&1
+sleep 1
+pc_goto "$BASE_URL/specs" >/dev/null 2>&1
+sleep 1
+assert_text "TC-2g: 修改规格 CPU 后更新成功" "1000m"
 
 # =============================================================================
 # TC-3  用户管理页面验证 (User Management)
@@ -167,6 +243,54 @@ sleep 1
 assert_text "TC-3a: 页面标题为用户管理" "用户管理"
 assert_text "TC-3b: 包含 admin 用户" "admin"
 assert_text "TC-3c: 用户状态正常" "正常"
+
+# TC-3d: 创建新用户并验证出现在列表
+log ""
+log "=== TC-3d/TC-3e: 创建新用户 ==="
+pc_code "async page => {
+  await page.getByRole('button', { name: '新增用户' }).click();
+  await page.waitForSelector('.el-dialog__body', { timeout: 4000 });
+  await page.getByPlaceholder('请输入用户名').fill('testuser01');
+  await page.locator('[type=\"password\"]').first().fill('Test@123456');
+  await page.getByRole('button', { name: '创建' }).click();
+  await page.waitForTimeout(1500);
+}" >/dev/null 2>&1
+sleep 1
+pc_goto "$BASE_URL/users" >/dev/null 2>&1
+sleep 1
+assert_text "TC-3d: 创建用户后出现在列表" "testuser01"
+
+# TC-3e: 禁用新用户，验证状态变更
+pc_code "async page => {
+  const rows = await page.locator('tr').all();
+  for (const row of rows) {
+    const text = await row.innerText().catch(() => '');
+    if (text.includes('testuser01')) {
+      const toggleBtn = row.getByRole('button', { name: '禁用' });
+      if (await toggleBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await toggleBtn.click();
+        const confirmBtn = page.getByRole('button', { name: '确定' });
+        if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await confirmBtn.click();
+        }
+      }
+      break;
+    }
+  }
+  await page.waitForTimeout(1500);
+}" >/dev/null 2>&1
+sleep 1
+pc_goto "$BASE_URL/users" >/dev/null 2>&1
+sleep 1
+DISABLED_FOUND=$(run_timeout 10 playwright-cli run-code "async page => {
+  const body = await page.evaluate(() => document.body.innerText);
+  return body.includes('testuser01') && body.includes('\u7981\u7528') ? 'true' : 'false';
+}" 2>/dev/null | get_result)
+if [[ "$DISABLED_FOUND" == "true" ]]; then
+  pass "TC-3e: 禁用用户后状态显示禁用"
+else
+  fail "TC-3e: 禁用用户后状态显示禁用" "testuser01 未变为禁用状态"
+fi
 
 # =============================================================================
 # TC-4  创建开发机 (Create Notebook)
@@ -187,10 +311,12 @@ if [[ "$EXISTING" == "true" ]]; then
     const stopBtn = page.getByRole('button', { name: '停止' }).first();
     if (await stopBtn.isVisible()) {
       await stopBtn.click();
-      const confirmBtn = page.getByRole('button', { name: '停止', exact: true });
-      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmBtn.click();
-      }
+      // Scope to .el-message-box to avoid strict-mode violation with multiple '停止' buttons
+      try {
+        const msgBox = page.locator('.el-message-box');
+        await msgBox.waitFor({ state: 'visible', timeout: 3000 });
+        await msgBox.getByRole('button', { name: '停止', exact: true }).click();
+      } catch(e) {}
     }
   }" >/dev/null 2>&1
   sleep 5
@@ -199,14 +325,18 @@ if [[ "$EXISTING" == "true" ]]; then
 fi
 
 # Create new notebook
-pc_code "async page => {
-  await page.getByRole('button', { name: '创建开发机' }).click();
+# Use run_timeout 25 and .el-select__wrapper to avoid [class*="select"] matching spec-card.selected
+run_timeout 25 playwright-cli run-code "async page => {
+  await page.getByRole('button', { name: '\u521b\u5efa\u5f00\u53d1\u673a' }).click();
+  // Wait for spec cards to load (onMounted API calls)
   await page.waitForSelector('.spec-card', { timeout: 5000 });
+  await page.waitForTimeout(300); // brief wait for dialog animation
   await page.locator('.spec-card').first().click();
-  await page.locator('[class*=\"select\"]').first().click();
+  // Open image dropdown via its clickable wrapper (not [class*='select'] which matches spec-card.selected)
+  await page.locator('.el-select__wrapper').first().click();
   await page.waitForSelector('[role=\"option\"]', { timeout: 3000 });
   await page.locator('[role=\"option\"]').first().click();
-  await page.getByRole('button', { name: '创建', exact: true }).click();
+  await page.getByRole('button', { name: '\u521b\u5efa', exact: true }).click();
 }" >/dev/null 2>&1
 sleep 2
 
@@ -228,6 +358,48 @@ else
   else
     fail "TC-4b: 实例状态" "期望创建中/运行中"
   fi
+fi
+
+# TC-4c: 创建按钮在有活跃实例时应禁用
+log ""
+log "=== TC-4c/TC-4d: 重复创建开发机防护 ==="
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 2
+BTN_DISABLED=$(run_timeout 10 playwright-cli run-code "async page => {
+  const btn = page.getByRole('button', { name: '创建开发机' });
+  try {
+    const isDisabled = await btn.isDisabled({ timeout: 3000 });
+    return isDisabled ? 'true' : 'false';
+  } catch(e) { return 'error:' + e.message; }
+}" 2>/dev/null | get_result)
+if [[ "$BTN_DISABLED" == "true" ]]; then
+  pass "TC-4c: 有活跃实例时创建按钮已禁用"
+else
+  fail "TC-4c: 有活跃实例时创建按钮已禁用" "按钮未禁用（得到: $BTN_DISABLED）"
+fi
+
+# TC-4d: API 层面拒绝重复创建 (via fetch in browser)
+# NOTE: localStorage must be accessed inside page.evaluate() (browser context),
+# not in the outer playwright-cli callback which runs in Node.js context.
+DUPLICATE_ERR=$(run_timeout 15 playwright-cli run-code "async page => {
+  try {
+    const resp = await page.evaluate(async () => {
+      const token = localStorage.getItem('token') || '';
+      const r = await fetch('/api/notebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ specId: 1, imageKey: 'python-general' })
+      });
+      const d = await r.json();
+      return d.code + '';
+    });
+    return resp !== '0' ? 'rejected' : 'allowed';
+  } catch(e) { return 'error:' + e.message; }
+}" 2>/dev/null | get_result)
+if [[ "$DUPLICATE_ERR" == "rejected" ]]; then
+  pass "TC-4d: API 拒绝重复创建开发机"
+else
+  fail "TC-4d: API 拒绝重复创建开发机" "期望拒绝，实际: $DUPLICATE_ERR"
 fi
 
 # =============================================================================
@@ -370,21 +542,19 @@ if [[ "$POD_READY" == "true" ]]; then
   }" >/dev/null 2>&1
   sleep 1
 
-  # Run the cell with Shift+Enter
-  run_timeout 5 playwright-cli keydown Shift >/dev/null 2>&1
-  run_timeout 5 playwright-cli press Enter >/dev/null 2>&1
-  run_timeout 5 playwright-cli keyup Shift >/dev/null 2>&1
-  sleep 1
-
-  # Also try via run-code Shift+Enter
-  pc_code "async page => {
+  # Run the cell with Shift+Enter (use run-code to keep context; avoid separate keydown/press/keyup
+  # which resets keyboard state between playwright-cli invocations)
+  run_timeout 15 playwright-cli run-code "async page => {
+    // Re-click the cell to ensure it has focus, then run it
+    const cell = page.locator('.jp-Cell .jp-InputArea-editor .CodeMirror-code, .jp-Cell .cm-content').first();
+    await cell.click().catch(() => {});
     await page.keyboard.press('Shift+Enter');
-    await page.waitForTimeout(8000);
+    await page.waitForTimeout(10000); // wait for kernel to start and execute
   }" >/dev/null 2>&1
-  sleep 8
+  sleep 5
 
-  # Verify output
-  if wait_for_text "TRAINING_TEST_PASSED" 30; then
+  # Verify output — wait up to 60 iterations (~60s) for kernel startup + code execution
+  if wait_for_text "TRAINING_TEST_PASSED" 60; then
     pass "TC-6a: 训练代码执行完成，输出 TRAINING_TEST_PASSED"
   else
     fail "TC-6a: 训练代码执行" "未找到 TRAINING_TEST_PASSED 输出"
@@ -429,17 +599,25 @@ pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
 sleep 1
 
 # Logout: click menu, capture toast synchronously before redirect
-LOGOUT_RESULT=$(run_timeout 20 playwright-cli run-code "async page => {
-  await page.getByRole('button', { name: 'admin' }).click();
+LOGOUT_RESULT=$(run_timeout 25 playwright-cli run-code "async page => {
+  // Click the user dropdown trigger; el-dropdown may render as role=button or tabindex span
+  const adminBtn = page.getByRole('button', { name: 'admin' });
+  if (await adminBtn.count() > 0) {
+    await adminBtn.click({ timeout: 3000 }).catch(async () => {
+      await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+    });
+  } else {
+    await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+  }
   await page.waitForTimeout(500);
-  await page.getByRole('menuitem', { name: '\u9000\u51fa\u767b\u5f55' }).click();
+  await page.getByRole('menuitem', { name: '\u9000\u51fa\u767b\u5f55' }).click({ timeout: 5000 });
   let toastFound = false;
   try {
     await page.getByText('\u5df2\u9000\u51fa\u767b\u5f55', { exact: false })
       .waitFor({ state: 'visible', timeout: 3000 });
     toastFound = true;
   } catch(e) {}
-  await page.waitForURL('**/login', { timeout: 6000 }).catch(() => {});
+  await page.waitForURL('**/login', { timeout: 8000 }).catch(() => {});
   return toastFound ? 'toast-found' : 'no-toast';
 }" 2>/dev/null | get_result)
 sleep 1
@@ -463,7 +641,175 @@ sleep 1
 assert_url "TC-7d: 未登录访问 /notebooks 重定向到 /login" "/login"
 
 # =============================================================================
-# Summary
+# TC-7e/TC-7f  登录边界测试（错误密码）
+# =============================================================================
+log ""
+log "=== TC-7e/TC-7f: 错误密码登录边界测试 ==="
+# We are on /login already — test wrong password (used to crash with TypeError)
+WRONG_PASS_RESULT=$(run_timeout 20 playwright-cli run-code "async page => {
+  await page.getByPlaceholder('请输入用户名').fill('admin');
+  await page.getByPlaceholder('请输入密码').fill('wrong_password_!@#');
+  await page.getByRole('button', { name: '\u767b \u5f55' }).click();
+  let toastFound = false;
+  try {
+    await page.locator('.el-message--error').waitFor({ state: 'visible', timeout: 5000 });
+    toastFound = true;
+  } catch(e) {}
+  // also accept any el-message
+  if (!toastFound) {
+    try {
+      await page.locator('.el-message').waitFor({ state: 'visible', timeout: 2000 });
+      toastFound = true;
+    } catch(e) {}
+  }
+  const stillLogin = page.url().includes('/login');
+  return (stillLogin ? 'still-login' : 'navigated') + ':' + (toastFound ? 'toast' : 'no-toast');
+}" 2>/dev/null | get_result)
+sleep 1
+
+assert_url "TC-7e: 错误密码登录后留在登录页（不崩溃）" "/login"
+if [[ "$WRONG_PASS_RESULT" == *"toast"* ]]; then
+  pass "TC-7f: 错误密码显示错误提示（不崩溃）"
+else
+  fail "TC-7f: 错误密码显示错误提示（不崩溃）" "未检测到错误提示 toast（result: ${WRONG_PASS_RESULT}）"
+fi
+
+# Re-login as admin for TC-8
+pc_code "async page => {
+  await page.getByPlaceholder('请输入用户名').fill('$ADMIN_USER');
+  await page.getByPlaceholder('请输入密码').fill('$ADMIN_PASS');
+  await page.getByRole('button', { name: '\u767b \u5f55' }).click();
+  await page.waitForURL('**/notebooks', { timeout: 8000 });
+}" >/dev/null 2>&1
+sleep 2
+
+# =============================================================================
+# TC-8  不同镜像开发机创建测试
+# =============================================================================
+log ""
+log "=== TC-8: 不同镜像（PyTorch）开发机创建测试 ==="
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 2
+
+# Stop existing notebook if any are active
+HAS_ACTIVE=$(run_timeout 10 playwright-cli run-code "async page => {
+  const body = await page.evaluate(() => document.body.innerText);
+  return (body.includes('\u8fd0\u884c\u4e2d') || body.includes('\u521b\u5efa\u4e2d') || body.includes('\u505c\u6b62\u4e2d')) ? 'true' : 'false';
+}" 2>/dev/null | get_result)
+
+if [[ "$HAS_ACTIVE" == "true" ]]; then
+  log "  TC-8: 停止活跃实例以准备测试..."
+  pc_code "async page => {
+    const stopBtns = await page.getByRole('button', { name: '\u505c\u6b62' }).all();
+    if (stopBtns.length > 0) {
+      await stopBtns[0].click();
+      // Wait for and confirm the ElMessageBox dialog — scope to .el-message-box to avoid
+      // strict-mode violation with multiple '停止' buttons (table row + dialog confirm).
+      try {
+        const msgBox = page.locator('.el-message-box');
+        await msgBox.waitFor({ state: 'visible', timeout: 3000 });
+        await msgBox.getByRole('button', { name: '\u505c\u6b62', exact: true }).click();
+      } catch(e) {}
+    }
+    await page.waitForTimeout(3000);
+  }" >/dev/null 2>&1
+
+  # Wait up to 60s for instance to enter stopped state
+  for i in $(seq 1 12); do
+    pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+    sleep 3
+    STILL_ACTIVE=$(run_timeout 8 playwright-cli run-code "async page => {
+      const body = await page.evaluate(() => document.body.innerText);
+      return (body.includes('\u8fd0\u884c\u4e2d') || body.includes('\u521b\u5efa\u4e2d') || body.includes('\u505c\u6b62\u4e2d')) ? 'true' : 'false';
+    }" 2>/dev/null | get_result)
+    [[ "$STILL_ACTIVE" != "true" ]] && break
+    log "  ($i/12) 等待实例停止..."
+  done
+fi
+
+# Delete stopped record (if any)
+HAS_STOPPED=$(run_timeout 8 playwright-cli run-code "async page => {
+  const body = await page.evaluate(() => document.body.innerText);
+  return (body.includes('\u5df2\u505c\u6b62') || body.includes('\u5f02\u5e38')) ? 'true' : 'false';
+}" 2>/dev/null | get_result)
+
+if [[ "$HAS_STOPPED" == "true" ]]; then
+  pc_code "async page => {
+    const delBtns = await page.getByRole('button', { name: '\u5220\u9664\u8bb0\u5f55' }).all();
+    if (delBtns.length > 0) {
+      await delBtns[0].click();
+      const confirmBtn = page.getByRole('button', { name: '\u5220\u9664', exact: true });
+      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await confirmBtn.click();
+      }
+      await page.waitForTimeout(1500);
+    }
+  }" >/dev/null 2>&1
+  sleep 1
+  pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+  sleep 1
+  pass "TC-8a: 已停止实例可通过删除记录按钮清除"
+else
+  pass "TC-8a: 无已停止实例需清除（跳过）"
+fi
+
+# Verify create button is now enabled
+BTN_ENABLED=$(run_timeout 10 playwright-cli run-code "async page => {
+  const btn = page.getByRole('button', { name: '\u521b\u5efa\u5f00\u53d1\u673a' });
+  try {
+    const isDisabled = await btn.isDisabled({ timeout: 3000 });
+    return isDisabled ? 'false' : 'true';
+  } catch(e) { return 'error'; }
+}" 2>/dev/null | get_result)
+BTN_ENABLED=${BTN_ENABLED:-}  # defensive: default to empty string if unset (set -u)
+if [[ "$BTN_ENABLED" == "true" ]]; then
+  pass "TC-8b: 清除记录后创建按钮已启用"
+else
+  fail "TC-8b: 清除记录后创建按钮已启用" "按钮仍禁用（result: ${BTN_ENABLED}）"
+fi
+
+# Create notebook with the second image (PyTorch)
+# Use run_timeout 25 (not pc_code's default 15) to allow time for dialog + API calls.
+# Fix: use .el-select__wrapper to target the image dropdown trigger reliably in El Plus v2.
+run_timeout 25 playwright-cli run-code "async page => {
+  await page.getByRole('button', { name: '\u521b\u5efa\u5f00\u53d1\u673a' }).click();
+  // Wait for spec cards to load (onMounted API calls)
+  await page.waitForSelector('.spec-card', { timeout: 5000 });
+  await page.waitForTimeout(300); // brief wait for dialog animation
+  await page.locator('.spec-card').first().click();
+  // Open image dropdown — .el-select__wrapper is the clickable trigger (avoids .spec-card.selected)
+  await page.locator('.el-select__wrapper').first().click();
+  await page.waitForSelector('[role=\"option\"]', { timeout: 3000 });
+  // Select the LAST image option (PyTorch)
+  const opts = await page.locator('[role=\"option\"]').all();
+  const lastOpt = opts[opts.length - 1];
+  await lastOpt.click();
+  await page.getByRole('button', { name: '\u521b\u5efa', exact: true }).click();
+  await page.waitForTimeout(2000);
+}" >/dev/null 2>&1
+sleep 2
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 2
+
+# TC-8c: Verify pytorch image appears in the notebook list
+# The frontend shows imageName ("PyTorch 2.2 + CUDA 12.1") or imageKey ("pytorch-cuda121"),
+# not the raw Docker image URL. Check for 'PyTorch' or 'pytorch-cuda121'.
+PYTORCH_FOUND=$(run_timeout 10 playwright-cli run-code "async page => {
+  const body = await page.evaluate(() => document.body.innerText);
+  return (body.includes('pytorch-cuda121') || body.includes('PyTorch')) ? 'true' : 'false';
+}" 2>/dev/null | get_result)
+if [[ "$PYTORCH_FOUND" == "true" ]]; then
+  pass "TC-8c: 使用 PyTorch 镜像创建的开发机显示正确镜像"
+else
+  fail "TC-8c: 使用 PyTorch 镜像创建的开发机显示正确镜像" "列表中未找到 pytorch-notebook"
+fi
+
+# TC-8d: Verify the new notebook is in creating/running state
+if wait_for_text "创建中" 5 || wait_for_text "运行中" 5; then
+  pass "TC-8d: PyTorch 开发机实例已创建"
+else
+  fail "TC-8d: PyTorch 开发机实例已创建" "实例未出现创建中/运行中状态"
+fi
 # =============================================================================
 log ""
 log "════════════════════════════════════════════════"

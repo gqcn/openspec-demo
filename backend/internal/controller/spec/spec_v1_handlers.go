@@ -3,14 +3,31 @@ package spec
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/net/ghttp"
 	v1 "github.com/gqcn/platform/backend/api/spec/v1"
+	"github.com/gqcn/platform/backend/internal/consts"
+	"github.com/gqcn/platform/backend/internal/model"
 	"github.com/gqcn/platform/backend/internal/model/do"
+	"github.com/gqcn/platform/backend/internal/model/entity"
 	svcSpec "github.com/gqcn/platform/backend/internal/service/spec"
 )
 
-// List handles GET /api/spec — returns enabled specs.
+// List handles GET /api/spec — returns all specs for admin, enabled-only for regular users.
 func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
-	list, err := svcSpec.List(ctx)
+	// Admin sees all specs (including disabled); regular users see only enabled ones.
+	isAdmin := false
+	if u := ghttp.RequestFromCtx(ctx).GetCtxVar(consts.ContextKeyUser).Val(); u != nil {
+		if ctxUser, ok := u.(*model.ContextUser); ok {
+			isAdmin = ctxUser.IsAdmin == 1
+		}
+	}
+
+	var list []*entity.Spec
+	if isAdmin {
+		list, err = svcSpec.ListAll(ctx)
+	} else {
+		list, err = svcSpec.List(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}

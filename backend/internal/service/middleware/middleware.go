@@ -2,8 +2,6 @@
 package middleware
 
 import (
-	"net/http"
-
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -16,6 +14,11 @@ import (
 // HandlerResponse is a middleware that wraps all handler responses into a unified JSON structure.
 func HandlerResponse(r *ghttp.Request) {
 	r.Middleware.Next()
+
+	// If a middleware (e.g. Auth) already wrote its own response, skip wrapping.
+	if len(r.Response.Buffer()) > 0 {
+		return
+	}
 
 	var (
 		msg  string
@@ -30,7 +33,6 @@ func HandlerResponse(r *ghttp.Request) {
 		if errCode.Code() > 0 {
 			code = errCode
 		}
-		r.Response.WriteStatus(http.StatusOK)
 		r.Response.WriteJson(g.Map{
 			"code":    code.Code(),
 			"message": msg,
@@ -59,7 +61,6 @@ func Auth(r *ghttp.Request) {
 	}
 	claims, err := auth.ParseToken(r.GetCtx(), token)
 	if err != nil {
-		r.Response.WriteStatus(http.StatusUnauthorized)
 		r.Response.WriteJson(g.Map{
 			"code":    401,
 			"message": "未授权，请先登录",
@@ -81,14 +82,14 @@ func Auth(r *ghttp.Request) {
 func AdminOnly(r *ghttp.Request) {
 	u := r.GetCtxVar(consts.ContextKeyUser).Val()
 	if u == nil {
-		r.Response.WriteStatus(http.StatusForbidden)
+
 		r.Response.WriteJson(g.Map{"code": 403, "message": "无权限", "data": nil})
 		r.ExitAll()
 		return
 	}
 	user := u.(*model.ContextUser)
 	if user.IsAdmin != 1 {
-		r.Response.WriteStatus(http.StatusForbidden)
+
 		r.Response.WriteJson(g.Map{"code": 403, "message": "仅管理员可操作", "data": nil})
 		r.ExitAll()
 		return

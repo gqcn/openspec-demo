@@ -6,6 +6,7 @@ import (
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gqcn/platform/backend/internal/consts"
 	"github.com/gqcn/platform/backend/internal/dao"
 	"github.com/gqcn/platform/backend/internal/model/do"
@@ -34,6 +35,7 @@ func Create(ctx context.Context, username, password, email string, isAdmin uint)
 		PasswordHash: hash,
 		Email:        email,
 		IsAdmin:      isAdmin,
+		Uid:          uint(0), // placeholder to satisfy NOT NULL; updated below to id+UIDOffset
 		Status:       1,
 	}).Insert()
 	if err != nil {
@@ -46,8 +48,8 @@ func Create(ctx context.Context, username, password, email string, isAdmin uint)
 	id = uint(lastId)
 	uid = uint(lastId) + consts.UIDOffset
 
-	// Update uid field (uid = 10000 + id)
-	_, err = dao.Users.Ctx(ctx).Where("id", id).Data(do.User{Uid: uid}).Update()
+	// Update uid field (uid = 10000 + id); use g.Map to update only uid column
+	_, err = dao.Users.Ctx(ctx).Where("id", id).Data(g.Map{"uid": uid}).Update()
 	return
 }
 
