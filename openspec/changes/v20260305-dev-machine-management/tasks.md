@@ -136,16 +136,58 @@
   - 修复：JupyterLab 4.x 启动方式（NOTEBOOK_ARGS env var 替代废弃的 --NotebookApp.*）
   - 修复：Ingress 去掉 rewrite-target，改用 PathTypePrefix 保留完整路径
   - 前端代理：Vite 新增 /jupyter/ → http://platform.internal:8081 代理
+  - Token 生成：改用 `guid.S()`（GoFrame `util/guid`），移除 `uuid` 依赖
 - [x] **QA-2** 端到端流程验证：创建 → 访问 JupyterLab → Pod 运行中
   - 创建开发机 → pod 1/1 Running（0 restarts）→ 前端状态 运行中 ✓
   - http://localhost:3002/jupyter/{token}/lab?token={token} 正常加载 JupyterLab UI ✓
   - /home/admin 文件浏览器可见、NFS work 目录挂载正常 ✓
   - 数据持久化（停止→重建恢复）、停止流程待进一步验证
+- [x] **QA-8** [NEW] JupyterLab 中运行训练代码验证
+  - 在 JupyterLab 中新建 Python 3 Notebook，执行梯度下降线性回归训练  
+  - 验证：训练收敛（w≈2.0，b≈0.0），无 AssertionError/Traceback 输出
+  - 验证：输出 `TRAINING_TEST_PASSED`
 - [ ] **QA-3** 多用户权限隔离验证：用户 A 无法访问用户 B 的 `/home/jovyan`
 - [ ] **QA-4** `/share` 目录读写验证：多用户互相可读写
 - [ ] **QA-5** WebSocket 稳定性验证：JupyterLab kernel 通信、Terminal 长时间连接不断开
 - [ ] **QA-6** 闲置检测联调：mock `last_activity` 超时，验证回收流程
 - [ ] **QA-7** GPU 规格实例创建验证（需 GPU 节点）
+
+---
+
+## 六、测试用例明细
+
+> 测试脚本：`hack/tests/e2e-test.sh`（playwright-cli）
+
+| 编号 | 测试用例 | 覆盖 QA | 验证点 |
+|------|---------|---------|--------|
+| TC-1a | 登录后跳转到 /notebooks | QA-1 | 输入凭据后 URL 为 /notebooks |
+| TC-1b | 侧边栏显示管理员菜单 | QA-1 | 页面包含"规格管理"菜单项 |
+| TC-1c | 顶部显示用户名 | QA-1 | 页面包含"admin"用户名 |
+| TC-2a | 规格管理页面标题 | QA-1 | 页面含"规格管理"文本 |
+| TC-2b | CPU-小 规格存在 | QA-1 | 列表包含 CPU-小 |
+| TC-2c | CPU-大 规格存在 | QA-1 | 列表包含 CPU-大 |
+| TC-2d | GPU-标准 规格存在 | QA-1 | 列表包含 GPU-标准 |
+| TC-2e | 规格编辑操作可见 | QA-1 | 列表含"编辑"按钮 |
+| TC-3a | 用户管理页面标题 | QA-1 | 页面含"用户管理"文本 |
+| TC-3b | admin 用户存在 | QA-1 | 列表包含 admin |
+| TC-3c | admin 用户状态正常 | QA-1 | 状态列显示"正常" |
+| TC-4a | 创建开发机记录存在 | QA-2 | 列表包含当前用户名 |
+| TC-4b | 实例状态为创建中或运行中 | QA-2 | status ∈ {创建中, 运行中} |
+| TC-5a | Pod 1/1 Running | QA-2 | kubectl 120s 内 Pod Ready |
+| TC-5b | 前端实例状态运行中 | QA-2 | 页面显示"运行中" |
+| TC-5c | JupyterLab UI 加载成功 | QA-2 | 新标签页 jp-* DOM 元素数量 > 5 |
+| TC-5d | 文件浏览器可见 | QA-2 | .jp-FileBrowser / .jp-BreadCrumbs 元素存在 |
+| TC-6a | 训练代码执行完成 | QA-8 | 输出含 TRAINING_TEST_PASSED |
+| TC-6b | 训练代码无运行错误 | QA-8 | 不含 AssertionError/Traceback |
+| TC-6c | 梯度下降收敛 | QA-8 | 输出包含 Trained: 行（断言通过即 w≈2.0） |
+| TC-7a | 退出登录跳转 /login | QA-1 | URL 变为 /login |
+| TC-7b | 退出成功提示 | QA-1 | 页面含“已退出登录” |
+| TC-7c | 登录表单可见 | QA-1 | 登录按鈕文字可见（登 录） |
+| TC-7d | 未登录访问保护路由重定向 | QA-1 | /notebooks → /login |
+
+> 最终执行结果（2026-03-05）：**PASS=24 FAIL=0** — 全郡 24 个测试用例全部通过 ✅
+
+
 
 ---
 

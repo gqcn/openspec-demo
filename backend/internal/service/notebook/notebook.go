@@ -4,14 +4,13 @@ package notebook
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gtime"
-	"github.com/google/uuid"
+	"github.com/gogf/gf/v2/util/guid"
 	"github.com/gqcn/platform/backend/internal/consts"
 	"github.com/gqcn/platform/backend/internal/dao"
 	"github.com/gqcn/platform/backend/internal/model/do"
@@ -76,8 +75,8 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 		return nil, gerror.NewCode(gcode.CodeNotFound, "镜像不存在")
 	}
 
-	// 4. Generate token (UUID without hyphens, 32 chars — fits k8s label 63-char limit)
-	token := strings.ReplaceAll(uuid.New().String(), "-", "")
+	// 4. Generate token via guid.S() — 32 hex chars, fits k8s label 63-char limit
+	token := guid.S()
 
 	// 5. Pod name
 	podName := consts.PodNamePrefix + username
