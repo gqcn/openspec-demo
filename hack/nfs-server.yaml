@@ -1,6 +1,15 @@
 # NFS Server Deployment（集群内模拟 NFS，仅用于本地测试）
 # 生产环境请使用外部 NFS 服务器，并修改 PV 中的 server 和 path 字段
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nfs-exports
+  namespace: jupyter
+data:
+  jupyter.exports: |
+    /nfsshare *(rw,sync,no_subtree_check,no_root_squash,no_all_squash,insecure)
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,18 +29,23 @@ spec:
     spec:
       containers:
       - name: nfs-server
-        image: itsthenetwork/nfs-server-alpine:latest
+        image: erichough/nfs-server:latest
+        imagePullPolicy: Never
         env:
-        - name: SHARED_DIRECTORY
-          value: /data
+        - name: NFS_EXPORT_0
+          value: "/nfsshare *(rw,sync,no_subtree_check,no_root_squash,no_all_squash,insecure)"
         ports:
         - containerPort: 2049
           name: nfs
         securityContext:
           privileged: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - SETPCAP
         volumeMounts:
         - name: storage
-          mountPath: /data
+          mountPath: /nfsshare
       volumes:
       - name: storage
         emptyDir: {}   # 测试用：Pod 重启后数据丢失，生产请改为 hostPath 或外部 NFS
@@ -49,8 +63,10 @@ spec:
     targetPort: 2049
     protocol: TCP
   clusterIP: None   # Headless Service，确保 DNS 解析稳定
+  # NOTE: 挂载 PV 时需使用 Pod IP 而非 DNS 名，详见 setup-kind.sh 中的动态 IP 获取逻辑
 ---
 # PersistentVolume（指向集群内 NFS Server）
+# NOTE: spec.nfs.server 中的 NFS_SERVER_IP 占位符由 setup-kind.sh 替换为实际 Pod IP
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -63,8 +79,8 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
   nfs:
-    server: nfs-server.jupyter.svc.cluster.local
-    path: /
+    server: NFS_SERVER_IP
+    path: /nfsshare
 ---
 # PersistentVolumeClaim
 apiVersion: v1

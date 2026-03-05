@@ -55,7 +55,8 @@ function watchPolling() {
 }
 
 async function handleOpen(nb: Instance) {
-  const url = `/jupyter/${nb.token}/`
+  // Include token as query param for auto-authentication
+  const url = `/jupyter/${nb.token}/lab?token=${nb.token}`
   window.open(url, '_blank')
 }
 

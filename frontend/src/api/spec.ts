@@ -3,11 +3,13 @@ import http from './http'
 export interface Spec {
   id: number
   name: string
+  description: string
   cpu: string
   memory: string
   gpu: number
   gpuType: string
-  status: number
+  enabled: number
+  sortOrder: number
   createdAt: string
 }
 
@@ -19,23 +21,30 @@ export interface CreateSpecReq {
   gpuType: string
 }
 
-export interface UpdateSpecReq extends CreateSpecReq {
+export interface UpdateSpecReq {
   id: number
-  status: number
+  name?: string
+  cpu?: string
+  memory?: string
+  gpu?: number
+  gpuType?: string
+  enabled?: number
 }
 
-export function listSpecs() {
-  return http.get<any, { code: number; data: Spec[] }>('/spec/list')
+export async function listSpecs(): Promise<{ code: number; data: Spec[] }> {
+  const res: any = await http.get('/spec')
+  return { code: res.code, data: res.data?.list || [] }
 }
 
 export function createSpec(data: CreateSpecReq) {
-  return http.post<any, { code: number; data: Spec }>('/spec/create', data)
+  return http.post<any, { code: number; data: Spec }>('/spec', data)
 }
 
 export function updateSpec(data: UpdateSpecReq) {
-  return http.put<any, { code: number }>('/spec/update', data)
+  const { id, ...rest } = data
+  return http.put<any, { code: number }>(`/spec/${id}`, rest)
 }
 
 export function deleteSpec(id: number) {
-  return http.delete<any, { code: number }>(`/spec/delete/${id}`)
+  return http.delete<any, { code: number }>(`/spec/${id}`)
 }

@@ -4,6 +4,7 @@ package notebook
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/errors/gcode"
@@ -75,8 +76,8 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 		return nil, gerror.NewCode(gcode.CodeNotFound, "镜像不存在")
 	}
 
-	// 4. Generate token (GUID without hyphens)
-	token := fmt.Sprintf("%x", uuid.New())
+	// 4. Generate token (UUID without hyphens, 32 chars — fits k8s label 63-char limit)
+	token := strings.ReplaceAll(uuid.New().String(), "-", "")
 
 	// 5. Pod name
 	podName := consts.PodNamePrefix + username

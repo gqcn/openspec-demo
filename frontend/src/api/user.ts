@@ -16,14 +16,15 @@ export interface CreateUserReq {
   isAdmin: number
 }
 
-export function listUsers() {
-  return http.get<any, { code: number; data: User[] }>('/user/list')
+export async function listUsers(): Promise<{ code: number; data: User[] }> {
+  const res: any = await http.get('/user')
+  return { code: res.code, data: res.data?.list || [] }
 }
 
 export function createUser(data: CreateUserReq) {
-  return http.post<any, { code: number; data: User }>('/user/create', data)
+  return http.post<any, { code: number; data: { id: number; uid: number } }>('/user', data)
 }
 
 export function updateUserStatus(id: number, status: number) {
-  return http.put<any, { code: number }>('/user/update-status', { id, status })
+  return http.put<any, { code: number }>(`/user/${id}/status`, { status })
 }

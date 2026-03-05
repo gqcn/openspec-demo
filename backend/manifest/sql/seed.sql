@@ -54,7 +54,7 @@ INSERT INTO `specs` (`name`, `description`, `cpu`, `memory`, `gpu`, `gpu_type`, 
 INSERT INTO `users` (`username`, `password_hash`, `uid`, `email`, `is_admin`, `status`) VALUES
 (
   'admin',
-  '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+  '$2a$10$GXCK42S2MbELBciA7BiVoeVmC41BvLjm.Flo.F3f2wmlx1bWKEv3q',
   10001,
   'admin@platform.internal',
   1,

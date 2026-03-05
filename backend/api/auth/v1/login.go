@@ -12,5 +12,9 @@ type LoginReq struct {
 
 // LoginRes defines the login response.
 type LoginRes struct {
-	Token string `json:"token" description:"JWT token"`
+	Token    string `json:"token"    description:"JWT token"`
+	UserId   uint   `json:"userId"   description:"用户ID"`
+	Username string `json:"username" description:"用户名"`
+	IsAdmin  uint   `json:"isAdmin"  description:"是否管理员"`
+	Uid      uint   `json:"uid"      description:"Linux UID"`
 }

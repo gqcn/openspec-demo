@@ -11,15 +11,16 @@ import (
 )
 
 // CreateIngress creates a nginx Ingress for the JupyterLab instance identified by token.
-// Path: /jupyter/{token}/(.*)  →  svc-jupyterlab-{username}:8888
+// Path: /jupyter/{token}  →  svc-jupyterlab-{username}:8888 (no rewrite, full path forwarded)
+// JupyterLab is started with --ServerApp.base_url=/jupyter/{token}/ so it handles the full path.
 func CreateIngress(ctx context.Context, username, token string) error {
 	ns := Namespace(ctx)
 	ingressName := consts.IngressNamePrefix + token
 	host := g.Cfg().MustGet(ctx, "notebook.ingressHost", "platform.internal").String()
-	pathPrefix := fmt.Sprintf("/jupyter/%s(/|$)(.*)", token)
+	pathPrefix := fmt.Sprintf("/jupyter/%s", token)
 	svcName := ServiceBackendName(username)
 	port := int32(consts.JupyterPort)
-	pathType := networkingv1.PathTypeImplementationSpecific
+	pathType := networkingv1.PathTypePrefix
 	ingressClass := "nginx"
 
 	ing := &networkingv1.Ingress{
@@ -27,7 +28,8 @@ func CreateIngress(ctx context.Context, username, token string) error {
 			Name:      ingressName,
 			Namespace: ns,
 			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/rewrite-target":     "/$2",
+				// No rewrite-target: forward the full path to the pod.
+				// JupyterLab handles /jupyter/{token}/* via ServerApp.base_url.
 				"nginx.ingress.kubernetes.io/proxy-read-timeout": "3600",
 				"nginx.ingress.kubernetes.io/proxy-send-timeout": "3600",
 				"nginx.ingress.kubernetes.io/proxy-body-size":    "0",

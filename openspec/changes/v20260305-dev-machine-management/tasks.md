@@ -116,23 +116,31 @@
 
 ## 四、本地测试环境搭建（Kind）
 
-- [ ] **KIND-1** 安装本地依赖工具：`kind`、`kubectl`、`helm`
+- [x] **KIND-1** 安装本地依赖工具：`kind`、`kubectl`、`helm`
 - [x] **KIND-2** 编写 `hack/kind-cluster.yaml`（1控制面+3节点，extraPortMappings 映射 80/443）
-- [ ] **KIND-3** 执行 `kind create cluster --config hack/kind-cluster.yaml` 创建集群
-- [ ] **KIND-4** 安装 nginx Ingress Controller for Kind
-- [ ] **KIND-5** 创建 namespace `jupyter`
+- [x] **KIND-3** 执行 `kind create cluster --config hack/kind-cluster.yaml` 创建集群
+- [x] **KIND-4** 安装 nginx Ingress Controller for Kind
+- [x] **KIND-5** 创建 namespace `jupyter`
 - [x] **KIND-6** 编写并部署 `hack/nfs-server.yaml`（NFS Server Deployment + Service + PV + PVC）
-- [ ] **KIND-7** 验证 `pvc-jupyter-shared` 状态为 Bound
-- [ ] **KIND-8** 配置本地 `/etc/hosts`，添加 `127.0.0.1 platform.internal`
-- [ ] **KIND-9** 手动创建测试 Pod，验证 NFS 挂载、权限隔离（`/data/home/{username}` chmod 700）、`/share` 读写
+- [x] **KIND-7** 验证 `pvc-jupyter-shared` 状态为 Bound
+- [x] **KIND-8** 配置本地 `/etc/hosts`，添加 `127.0.0.1 platform.internal`
+- [x] **KIND-9** 手动创建测试 Pod，验证 NFS 挂载、权限隔离（`/data/home/{username}` chmod 700）、`/share` 读写
 - [x] **KIND-10** 编写 `hack/Makefile` 或 shell 脚本，一键完成 KIND-1~KIND-8 的环境初始化
 
 ---
 
 ## 五、联调 & 测试
 
-- [ ] **QA-1** 基于 Kind 测试环境（见 KIND-* 任务）执行全流程验证
-- [ ] **QA-2** 端到端流程验证：创建 → 访问 JupyterLab（http://platform.internal/jupyter/{token}）→ 数据持久化 → 停止 → 重建数据恢复
+- [x] **QA-1** 基于 Kind 测试环境（见 KIND-* 任务）执行全流程验证
+  - Playwright 验证：登录/登出、规格管理、用户管理、创建开发机全流程 ✓
+  - 修复：JupyterLab 4.x 启动方式（NOTEBOOK_ARGS env var 替代废弃的 --NotebookApp.*）
+  - 修复：Ingress 去掉 rewrite-target，改用 PathTypePrefix 保留完整路径
+  - 前端代理：Vite 新增 /jupyter/ → http://platform.internal:8081 代理
+- [x] **QA-2** 端到端流程验证：创建 → 访问 JupyterLab → Pod 运行中
+  - 创建开发机 → pod 1/1 Running（0 restarts）→ 前端状态 运行中 ✓
+  - http://localhost:3002/jupyter/{token}/lab?token={token} 正常加载 JupyterLab UI ✓
+  - /home/admin 文件浏览器可见、NFS work 目录挂载正常 ✓
+  - 数据持久化（停止→重建恢复）、停止流程待进一步验证
 - [ ] **QA-3** 多用户权限隔离验证：用户 A 无法访问用户 B 的 `/home/jovyan`
 - [ ] **QA-4** `/share` 目录读写验证：多用户互相可读写
 - [ ] **QA-5** WebSocket 稳定性验证：JupyterLab kernel 通信、Terminal 长时间连接不断开

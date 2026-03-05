@@ -57,13 +57,40 @@ echo "✅ namespace '${NAMESPACE}' 就绪"
 # Step 4: 部署集群内 NFS Server 并创建 PV/PVC
 # -------------------------------------------------------
 echo "🚀 部署 NFS Server 及存储资源..."
+# 先部署 Deployment + Service（不含 PV/PVC）
 kubectl apply -f "${SCRIPT_DIR}/nfs-server.yaml"
 
-echo "⏳ 等待 NFS Server 就绪（最多 60 秒）..."
+echo "⏳ 等待 NFS Server 就绪（最多 90 秒）..."
 kubectl wait -n "${NAMESPACE}" \
   --for=condition=ready pod \
   --selector=app=nfs-server \
-  --timeout=60s
+  --timeout=90s
+
+# 获取 NFS Server Pod IP（kubelet 挂载 NFS 需直接用 Pod IP，集群内 DNS 在节点网络不可用）
+echo "🔍 获取 NFS Server Pod IP..."
+NFS_SERVER_IP=""
+for i in $(seq 1 30); do
+  NFS_SERVER_IP=$(kubectl get pod -n "${NAMESPACE}" -l app=nfs-server \
+    -o jsonpath='{.items[0].status.podIP}' 2>/dev/null || echo "")
+  if [[ -n "${NFS_SERVER_IP}" ]]; then
+    echo "✅ NFS Server IP: ${NFS_SERVER_IP}"
+    break
+  fi
+  echo "  等待 IP 分配... (${i}/30)"
+  sleep 2
+done
+
+if [[ -z "${NFS_SERVER_IP}" ]]; then
+  echo "❌ 无法获取 NFS Server Pod IP，请检查 NFS 部署状态"
+  exit 1
+fi
+
+# 创建 PV/PVC（用实际 Pod IP 替换占位符）
+echo "🚀 创建 PVC（NFS server: ${NFS_SERVER_IP}）..."
+kubectl delete pvc pvc-jupyter-shared -n "${NAMESPACE}" --ignore-not-found 2>/dev/null
+kubectl delete pv jupyter-pv --ignore-not-found 2>/dev/null
+sed "s/NFS_SERVER_IP/${NFS_SERVER_IP}/g" "${SCRIPT_DIR}/nfs-server.yaml" | \
+  kubectl apply -f - 2>/dev/null || true
 
 echo "⏳ 等待 PVC 绑定..."
 for i in $(seq 1 30); do
@@ -77,27 +104,53 @@ for i in $(seq 1 30); do
 done
 
 # -------------------------------------------------------
-# Step 5: 初始化 /share 目录权限
+# Step 5: 预加载 busybox 镜像到 Kind 节点（离线环境）
 # -------------------------------------------------------
-echo "🚀 初始化 /share 目录..."
-kubectl run nfs-init --restart=Never --rm -i \
-  --image=busybox \
-  --namespace="${NAMESPACE}" \
-  --overrides='{
-    "spec": {
-      "containers": [{
-        "name": "nfs-init",
-        "image": "busybox",
-        "command": ["sh", "-c", "mkdir -p /data/share && chmod 1777 /data/share && echo done"],
-        "volumeMounts": [{"name": "workspace", "mountPath": "/data"}]
-      }],
-      "volumes": [{"name": "workspace", "persistentVolumeClaim": {"claimName": "pvc-jupyter-shared"}}]
-    }
-  }' -- sh -c "mkdir -p /data/share && chmod 1777 /data/share && echo 'done'" 2>/dev/null || true
-echo "✅ /share 目录初始化完成"
+echo "🚀 预加载 busybox:1.36 到 Kind 节点..."
+if ! docker image inspect busybox:1.36 &>/dev/null; then
+  docker pull busybox:1.36
+fi
+BUSYBOX_TAR=$(mktemp /tmp/busybox-XXXXXX.tar)
+docker save busybox:1.36 -o "${BUSYBOX_TAR}"
+for node in $(kind get nodes --name "${CLUSTER_NAME}"); do
+  docker cp "${BUSYBOX_TAR}" "${node}":/busybox.tar 2>/dev/null
+  docker exec "${node}" ctr --namespace=k8s.io images import --platform linux/arm64 /busybox.tar 2>/dev/null || true
+  echo "  已加载到节点: ${node}"
+done
+rm -f "${BUSYBOX_TAR}"
+echo "✅ busybox 预加载完成"
 
 # -------------------------------------------------------
-# Step 6: 配置本地 hosts
+# Step 6: 初始化 /share 目录权限
+# -------------------------------------------------------
+echo "🚀 初始化 /share 目录..."
+cat <<'PODEOF' | kubectl apply -n "${NAMESPACE}" -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-share-init
+  namespace: jupyter
+spec:
+  restartPolicy: Never
+  containers:
+  - name: init
+    image: busybox:1.36
+    imagePullPolicy: Never
+    command: ["sh", "-c"]
+    args:
+    - mkdir -p /data/share && chmod 2777 /data/share && echo "share init done"
+    volumeMounts:
+    - name: workspace
+      mountPath: /data
+  volumes:
+  - name: workspace
+    persistentVolumeClaim:
+      claimName: pvc-jupyter-shared
+PODEOF
+kubectl wait -n "${NAMESPACE}" --for=condition=ready pod/nfs-share-init --timeout=60s 2>/dev/null || true
+kubectl logs -n "${NAMESPACE}" nfs-share-init 2>/dev/null || true
+kubectl delete pod nfs-share-init -n "${NAMESPACE}" --ignore-not-found 2>/dev/null || true
+echo "✅ /share 目录初始化完成"
 # -------------------------------------------------------
 if grep -q "platform.internal" /etc/hosts 2>/dev/null; then
   echo "⚠️  /etc/hosts 中已有 platform.internal，跳过"

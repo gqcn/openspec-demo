@@ -88,12 +88,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 				{
 					Name:  "jupyterlab",
 					Image: opts.Image,
-					Command: []string{
-						"start.sh",
-						"start-notebook.sh",
-						fmt.Sprintf("--NotebookApp.token=%s", opts.Token),
-						fmt.Sprintf("--NotebookApp.base_url=%s", baseURL),
-					},
+					// Use start-notebook.sh without inline args; pass config via env vars
+					// (compatible with jupyter/base-notebook 4.x / jupyter_server 2.x)
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: ptrInt64(0),
 					},
@@ -102,7 +98,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 						{Name: "NB_GID", Value: fmt.Sprintf("%d", opts.Uid)},
 						{Name: "NB_USER", Value: opts.Username},
 						{Name: "JUPYTER_TOKEN", Value: opts.Token},
-						{Name: "JUPYTER_BASE_URL", Value: baseURL},
+						// Pass ServerApp.base_url via NOTEBOOK_ARGS (correct for JupyterLab 4.x)
+						{Name: "NOTEBOOK_ARGS", Value: fmt.Sprintf("--ServerApp.base_url=%s", baseURL)},
 						{Name: "CHOWN_HOME", Value: "yes"},
 						{Name: "CHOWN_HOME_OPTS", Value: "-R"},
 					},

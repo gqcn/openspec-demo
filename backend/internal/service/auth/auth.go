@@ -24,22 +24,22 @@ type PlatformClaims struct {
 	jwt.RegisteredClaims
 }
 
-// Login verifies credentials and returns a signed JWT token.
-func Login(ctx context.Context, username, password string) (token string, err error) {
+// Login verifies credentials and returns a signed JWT token plus user claims.
+func Login(ctx context.Context, username, password string) (token string, claims *PlatformClaims, err error) {
 	var user *entity.User
 	err = dao.Users.Ctx(ctx).Where("username", username).Where("status", 1).Scan(&user)
 	if err != nil {
-		return "", gerror.NewCode(gcode.CodeInternalError, "数据库查询失败")
+		return "", nil, gerror.NewCode(gcode.CodeInternalError, "数据库查询失败")
 	}
 	if user == nil {
-		return "", gerror.NewCode(gcode.CodeNotAuthorized, "用户名或密码错误")
+		return "", nil, gerror.NewCode(gcode.CodeNotAuthorized, "用户名或密码错误")
 	}
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", gerror.NewCode(gcode.CodeNotAuthorized, "用户名或密码错误")
+		return "", nil, gerror.NewCode(gcode.CodeNotAuthorized, "用户名或密码错误")
 	}
 
 	expireHour := g.Cfg().MustGet(ctx, "jwt.expireHour", 24).Int()
-	claims := PlatformClaims{
+	claims = &PlatformClaims{
 		UserId:   user.Id,
 		Username: user.Username,
 		IsAdmin:  user.IsAdmin,
@@ -52,7 +52,8 @@ func Login(ctx context.Context, username, password string) (token string, err er
 	}
 	secret := g.Cfg().MustGet(ctx, "jwt.secret", "changeme").String()
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString([]byte(secret))
+	token, err = t.SignedString([]byte(secret))
+	return token, claims, err
 }
 
 // ParseToken parses and validates the JWT token, returning its claims.

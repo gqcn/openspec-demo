@@ -7,6 +7,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -63,6 +64,11 @@ func InitUserHomeDir(ctx context.Context, username string, uid uint, pvcName str
 
 	_, err := Client(ctx).BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			// Job already completed from a prior run — home dir already initialized.
+			g.Log().Infof(ctx, "k8s InitUserHomeDir job %s already exists, skipping", jobName)
+			return nil
+		}
 		g.Log().Errorf(ctx, "k8s InitUserHomeDir job %s error: %v", jobName, err)
 	}
 	return err

@@ -1,12 +1,13 @@
 import http from './http'
 
 export interface ImageItem {
+  key: string
   name: string
-  tag: string
-  fullName: string
+  image: string
   description: string
 }
 
-export function listImages() {
-  return http.get<any, { code: number; data: ImageItem[] }>('/image/list')
+export async function listImages(): Promise<{ code: number; data: ImageItem[] }> {
+  const res: any = await http.get('/image')
+  return { code: res.code, data: res.data?.list || [] }
 }

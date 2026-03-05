@@ -30,7 +30,7 @@ jwt:
 kubernetes:
   # kubeconfig 路径，留空则使用集群内 ServiceAccount（生产部署）
   # 本地开发设置为 ~/.kube/config
-  kubeconfig: ""
+  kubeconfig: "/Users/john/.kube/config"
   namespace:  "jupyter"
 
 # JupyterLab 镜像列表（本期无镜像管理模块，由此配置维护）

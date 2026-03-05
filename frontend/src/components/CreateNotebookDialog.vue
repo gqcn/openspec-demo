@@ -19,7 +19,7 @@ const loading = ref(false)
 
 onMounted(async () => {
   const [sr, ir] = await Promise.all([listSpecs(), listImages()])
-  specs.value = (sr.data || []).filter((s: Spec) => s.status === 1)
+  specs.value = (sr.data || []).filter((s: Spec) => s.enabled === 1)
   images.value = ir.data || []
 })
 
@@ -28,7 +28,7 @@ async function handleCreate() {
   if (!selectedImage.value) return ElMessage.warning('请选择镜像')
   loading.value = true
   try {
-    await createNotebook({ specId: selectedSpecId.value, image: selectedImage.value })
+    await createNotebook({ specId: selectedSpecId.value, imageKey: selectedImage.value })
     ElMessage.success('开发机创建中，请稍候...')
     emit('created')
     emit('update:visible', false)
@@ -79,12 +79,12 @@ function specCardClass(spec: Spec) {
       <el-select v-model="selectedImage" placeholder="请选择镜像" style="width: 100%" size="large">
         <el-option
           v-for="img in images"
-          :key="img.fullName"
-          :label="`${img.name}:${img.tag}`"
-          :value="img.fullName"
+          :key="img.key"
+          :label="img.name"
+          :value="img.key"
         >
           <div>
-            <span style="font-weight: 600">{{ img.name }}:{{ img.tag }}</span>
+            <span style="font-weight: 600">{{ img.name }}</span>
             <span v-if="img.description" style="color: #909399; font-size: 12px; margin-left: 8px">{{ img.description }}</span>
           </div>
         </el-option>

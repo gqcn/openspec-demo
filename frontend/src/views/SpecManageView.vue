@@ -55,7 +55,7 @@ async function handleSave() {
   await formRef.value.validate()
   try {
     if (editingSpec.value) {
-      await updateSpec({ ...form, id: editingSpec.value.id, status: editingSpec.value.status })
+      await updateSpec({ ...form, id: editingSpec.value.id, enabled: editingSpec.value.enabled })
       ElMessage.success('更新成功')
     } else {
       await createSpec({ ...form })
@@ -69,11 +69,11 @@ async function handleSave() {
 }
 
 async function handleToggleStatus(spec: Spec) {
-  const newStatus = spec.status === 1 ? 0 : 1
+  const newStatus = spec.enabled === 1 ? 0 : 1
   const label = newStatus === 1 ? '启用' : '禁用'
   await ElMessageBox.confirm(`确认${label}规格 "${spec.name}" 吗？`, `${label}确认`, { type: 'warning' })
   try {
-    await updateSpec({ ...spec, status: newStatus })
+    await updateSpec({ id: spec.id, enabled: newStatus })
     ElMessage.success(`已${label}`)
     await fetchList()
   } catch (e: any) {
@@ -111,8 +111,8 @@ onMounted(fetchList)
       <el-table-column label="GPU 型号" prop="gpuType" width="140" />
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'info'" effect="light">
-            {{ row.status === 1 ? '启用' : '禁用' }}
+          <el-tag :type="row.enabled === 1 ? 'success' : 'info'" effect="light">
+            {{ row.enabled === 1 ? '启用' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -121,12 +121,12 @@ onMounted(fetchList)
         <template #default="{ row }">
           <el-button type="primary" size="small" link @click="openEdit(row)">编辑</el-button>
           <el-button
-            :type="row.status === 1 ? 'warning' : 'success'"
+            :type="row.enabled === 1 ? 'warning' : 'success'"
             size="small"
             link
             @click="handleToggleStatus(row)"
           >
-            {{ row.status === 1 ? '禁用' : '启用' }}
+            {{ row.enabled === 1 ? '禁用' : '启用' }}
           </el-button>
           <el-button type="danger" size="small" link @click="handleDelete(row)">删除</el-button>
         </template>
