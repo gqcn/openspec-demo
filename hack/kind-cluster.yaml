@@ -1,0 +1,45 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: kind-cluster
+nodes:
+  # 控制平面节点：映射 80/443 端口供 Ingress 使用
+  - role: control-plane
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+    - |
+      kind: InitConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+
+  # Worker 节点
+  - role: worker
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        name: node0
+
+  - role: worker
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        name: node1
+
+  - role: worker
+    image: kindest/node:v1.27.3
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        name: node2

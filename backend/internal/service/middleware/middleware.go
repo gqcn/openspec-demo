@@ -1,0 +1,97 @@
+// Package middleware provides HTTP middleware implementations.
+package middleware
+
+import (
+	"net/http"
+
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gqcn/platform/backend/internal/consts"
+	"github.com/gqcn/platform/backend/internal/model"
+	"github.com/gqcn/platform/backend/internal/service/auth"
+)
+
+// HandlerResponse is a middleware that wraps all handler responses into a unified JSON structure.
+func HandlerResponse(r *ghttp.Request) {
+	r.Middleware.Next()
+
+	var (
+		msg  string
+		err             = r.GetError()
+		res             = r.GetHandlerResponse()
+		code gcode.Code = gcode.CodeOK
+	)
+	if err != nil {
+		code = gcode.CodeInternalError
+		msg = err.Error()
+		errCode := gerror.Code(err)
+		if errCode.Code() > 0 {
+			code = errCode
+		}
+		r.Response.WriteStatus(http.StatusOK)
+		r.Response.WriteJson(g.Map{
+			"code":    code.Code(),
+			"message": msg,
+			"data":    nil,
+		})
+		return
+	}
+	r.Response.WriteJson(g.Map{
+		"code":    0,
+		"message": "success",
+		"data":    res,
+	})
+}
+
+// CORS sets permissive CORS headers.
+func CORS(r *ghttp.Request) {
+	r.Response.CORSDefault()
+	r.Middleware.Next()
+}
+
+// Auth validates the JWT Bearer token and injects ContextUser into the request context.
+func Auth(r *ghttp.Request) {
+	token := r.GetHeader("Authorization")
+	if len(token) > 7 && token[:7] == "Bearer " {
+		token = token[7:]
+	}
+	claims, err := auth.ParseToken(r.GetCtx(), token)
+	if err != nil {
+		r.Response.WriteStatus(http.StatusUnauthorized)
+		r.Response.WriteJson(g.Map{
+			"code":    401,
+			"message": "未授权，请先登录",
+			"data":    nil,
+		})
+		r.ExitAll()
+		return
+	}
+	r.SetCtxVar(consts.ContextKeyUser, &model.ContextUser{
+		Id:       claims.UserId,
+		Username: claims.Username,
+		IsAdmin:  claims.IsAdmin,
+		Uid:      claims.Uid,
+	})
+	r.Middleware.Next()
+}
+
+// AdminOnly allows only admin users (must be used after Auth middleware).
+func AdminOnly(r *ghttp.Request) {
+	u := r.GetCtxVar(consts.ContextKeyUser).Val()
+	if u == nil {
+		r.Response.WriteStatus(http.StatusForbidden)
+		r.Response.WriteJson(g.Map{"code": 403, "message": "无权限", "data": nil})
+		r.ExitAll()
+		return
+	}
+	user := u.(*model.ContextUser)
+	if user.IsAdmin != 1 {
+		r.Response.WriteStatus(http.StatusForbidden)
+		r.Response.WriteJson(g.Map{"code": 403, "message": "仅管理员可操作", "data": nil})
+		r.ExitAll()
+		return
+	}
+	r.Middleware.Next()
+}

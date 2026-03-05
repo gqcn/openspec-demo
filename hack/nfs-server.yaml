@@ -1,0 +1,82 @@
+# NFS Server Deployment（集群内模拟 NFS，仅用于本地测试）
+# 生产环境请使用外部 NFS 服务器，并修改 PV 中的 server 和 path 字段
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: jupyter
+  labels:
+    app: nfs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      containers:
+      - name: nfs-server
+        image: itsthenetwork/nfs-server-alpine:latest
+        env:
+        - name: SHARED_DIRECTORY
+          value: /data
+        ports:
+        - containerPort: 2049
+          name: nfs
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: storage
+          mountPath: /data
+      volumes:
+      - name: storage
+        emptyDir: {}   # 测试用：Pod 重启后数据丢失，生产请改为 hostPath 或外部 NFS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: jupyter
+spec:
+  selector:
+    app: nfs-server
+  ports:
+  - port: 2049
+    targetPort: 2049
+    protocol: TCP
+  clusterIP: None   # Headless Service，确保 DNS 解析稳定
+---
+# PersistentVolume（指向集群内 NFS Server）
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jupyter-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  nfs:
+    server: nfs-server.jupyter.svc.cluster.local
+    path: /
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-jupyter-shared
+  namespace: jupyter
+spec:
+  resources:
+    requests:
+      storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: jupyter-pv

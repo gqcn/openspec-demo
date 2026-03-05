@@ -1,0 +1,55 @@
+# HTTP Server
+server:
+  address:          ":8080"
+  dumpRouterMap:    true
+  routeOverWrite:   true
+  accessLogEnabled: true
+  openapiPath:      "/api.json"
+  swaggerPath:      "/swagger"
+
+# Logger
+logger:
+  level:  "all"
+  stdout: true
+
+# Database
+database:
+  logger:
+    level:  "all"
+    stdout: true
+  default:
+    link:  "mysql:root:password@tcp(127.0.0.1:3306)/platform"
+    debug: true
+
+# JWT
+jwt:
+  secret:     "change-me-in-production"
+  expireHour: 24
+
+# Kubernetes
+kubernetes:
+  # kubeconfig 路径，留空则使用集群内 ServiceAccount（生产部署）
+  # 本地开发设置为 ~/.kube/config
+  kubeconfig: ""
+  namespace:  "jupyter"
+
+# JupyterLab 镜像列表（本期无镜像管理模块，由此配置维护）
+images:
+  - key:         "base-notebook"
+    name:        "通用 Python 环境"
+    image:       "jupyter/base-notebook:latest"
+    description: "Python 3.11，含常用科学计算库"
+    enabled:     true
+  - key:         "pytorch-cuda121"
+    name:        "PyTorch 2.2 + CUDA 12.1"
+    image:       "jupyter/pytorch-notebook:latest"
+    description: "含 PyTorch、torchvision，适用于 GPU 实例"
+    enabled:     true
+
+# 开发机配置
+notebook:
+  idleTimeoutHours: 48    # 闲置超时小时数
+  checkIntervalMin: 60    # 闲置检测间隔（分钟）
+  pvcName:          "pvc-jupyter-shared"
+  ingressHost:      "platform.internal"
+  accessBaseURL:    "http://platform.internal"

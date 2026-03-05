@@ -1,0 +1,18 @@
+
+# CLI tool, only in development environment.
+# https://goframe.org/docs/cli
+gfcli:
+  gen:
+    dao:
+      - link:           "mysql:root:12345678@tcp(127.0.0.1:3306)/platform"
+        path:           "./internal/dao"
+        group:          "default"
+        tables:         "users,specs,instances"
+        descriptionTag: true
+        noJsonTag:      false
+        removePrefix:   ""
+
+  docker:
+    build: "-a amd64 -s linux -p temp -ew"
+    tagPrefixes:
+      - ghcr.io/gqcn/platform
