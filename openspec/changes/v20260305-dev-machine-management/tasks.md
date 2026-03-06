@@ -261,7 +261,7 @@
   - 不同镜像创建：选择 PyTorch 镜像创建开发机，实例列表显示正确镜像
   - 停止后清理：停止实例后"删除记录"按钮出现，删除后列表清空，创建按钮恢复可用
 - [ ] **QA-3** 多用户权限隔离验证：用户 A 无法访问用户 B 的 `/home/jovyan`
-- [ ] **QA-4** `/share` 目录读写验证：多用户互相可读写
+- [x] **QA-4** `/share` 目录读写验证：多用户互相可读写（TC-9a~TC-9d）
 - [ ] **QA-5** WebSocket 稳定性验证：JupyterLab kernel 通信、Terminal 长时间连接不断开
 - [ ] **QA-6** 闲置检测联调：mock `last_activity` 超时，验证回收流程
 - [ ] **QA-7** GPU 规格实例创建验证（需 GPU 节点）
@@ -310,11 +310,29 @@
 | TC-8b | 清除记录后创建按钮可用 | QA-9 | 按钮 disabled 为 false |
 | TC-8c | PyTorch 镜像创建正确 | QA-9 | 列表镜像列显示 'PyTorch' 或 'pytorch-cuda121' |
 | TC-8d | PyTorch 开发机进入创建流程 | QA-9 | 状态为创建中或运行中 |
+| TC-9a | admin 在 /share 创建共享文件 | QA-4 | kubectl exec 写入 /share 成功并可读回 |
+| TC-9b | testuser01 可见 /share 共享文件 | QA-4 | testuser01 Pod 中 cat admin 创建的文件内容正确 |
+| TC-9c | testuser01 可在 /share 写入文件 | QA-4 | testuser01 Pod 中写入 /share 成功并可读回 |
+| TC-9d | /share 包含两个用户的文件 | QA-4 | ls 验证 admin 和 testuser01 的文件同时存在 |
 
 > 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅  
 > （初版：PASS=24；后续 Bug 修复后新增 TC-7e/TC-7f、TC-2f/TC-2g、TC-3d/TC-3e、TC-4c/TC-4d、TC-8a~TC-8d 共 12 个，合计 36 个）
+> [HF-1] 新增 TC-9a~TC-9d（多用户 /share 共享目录访问），合计 40 个
 
 
+
+---
+
+## 人工验证修复（Hotfix）
+
+> 本节记录人工验证中发现的问题及修复记录。
+
+- [x] **HF-1** `hack/tests/e2e-test.sh`：缺少多用户 /share 共享目录访问测试用例
+  - 现象：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
+  - 根因：QA-4（/share 目录读写验证：多用户互相可读写）对应的测试用例未实现
+  - 影响：无法自动化验证多用户共享文件的核心功能
+  - 修复方案：在 e2e-test.sh 末尾新增 TC-9a~TC-9d 共 4 个测试用例：admin 写文件到 /share → 切换 testuser01 登录创建开发机 → 验证 testuser01 能读到 admin 的文件 → testuser01 写入 /share → 验证双方文件共存
+  - 验证：TC-9a~TC-9d 全部 PASS ✓（PASS=39 FAIL=1，唯一 FAIL 为预已存在的 TC-6b）
 
 ---
 

@@ -375,7 +375,7 @@ BTN_DISABLED=$(run_timeout 10 playwright-cli run-code "async page => {
 if [[ "$BTN_DISABLED" == "true" ]]; then
   pass "TC-4c: 有活跃实例时创建按钮已禁用"
 else
-  fail "TC-4c: 有活跃实例时创建按钮已禁用" "按钮未禁用（得到: $BTN_DISABLED）"
+  fail "TC-4c: 有活跃实例时创建按钮已禁用" "按钮未禁用（得到: ${BTN_DISABLED}）"
 fi
 
 # TC-4d: API 层面拒绝重复创建 (via fetch in browser)
@@ -810,6 +810,348 @@ if wait_for_text "创建中" 5 || wait_for_text "运行中" 5; then
 else
   fail "TC-8d: PyTorch 开发机实例已创建" "实例未出现创建中/运行中状态"
 fi
+# =============================================================================
+# TC-9  多用户 /share 共享目录访问测试 (Multi-user /share Access)
+# =============================================================================
+log ""
+log "=== TC-9: 多用户 /share 共享目录访问测试 ==="
+
+TESTUSER="testuser01"
+TESTUSER_PASS="Test@123456"
+SHARE_FILE_ADMIN="admin_share_test_$(date +%s).txt"
+SHARE_FILE_USER="testuser01_share_test_$(date +%s).txt"
+
+# ── Step 0: Clean up TC-8's instance (may be stuck in ImagePullBackOff) and
+#            create a fresh admin instance with the first (base-notebook) image ──
+log "  TC-9 setup: 清理 TC-8 实例，重新创建 admin 开发机（base-notebook 镜像）..."
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 2
+
+# Stop any active/creating instance
+TC9_HAS_ACTIVE=$(run_timeout 10 playwright-cli run-code "async page => {
+  const body = await page.evaluate(() => document.body.innerText);
+  return (body.includes('\u8fd0\u884c\u4e2d') || body.includes('\u521b\u5efa\u4e2d') || body.includes('\u505c\u6b62\u4e2d')) ? 'true' : 'false';
+}" 2>/dev/null | get_result)
+if [[ "$TC9_HAS_ACTIVE" == "true" ]]; then
+  pc_code "async page => {
+    const stopBtns = await page.getByRole('button', { name: '\u505c\u6b62' }).all();
+    if (stopBtns.length > 0) {
+      await stopBtns[0].click();
+      try {
+        const msgBox = page.locator('.el-message-box');
+        await msgBox.waitFor({ state: 'visible', timeout: 3000 });
+        await msgBox.getByRole('button', { name: '\u505c\u6b62', exact: true }).click();
+      } catch(e) {}
+    }
+    await page.waitForTimeout(3000);
+  }" >/dev/null 2>&1
+  for i in $(seq 1 12); do
+    pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+    sleep 3
+    TC9_STILL=$(run_timeout 8 playwright-cli run-code "async page => {
+      const body = await page.evaluate(() => document.body.innerText);
+      return (body.includes('\u8fd0\u884c\u4e2d') || body.includes('\u521b\u5efa\u4e2d') || body.includes('\u505c\u6b62\u4e2d')) ? 'true' : 'false';
+    }" 2>/dev/null | get_result)
+    [[ "$TC9_STILL" != "true" ]] && break
+    log "  ($i/12) 等待实例停止..."
+  done
+fi
+
+# Delete any stopped/failed record
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 1
+pc_code "async page => {
+  const delBtns = await page.getByRole('button', { name: '\u5220\u9664\u8bb0\u5f55' }).all();
+  if (delBtns.length > 0) {
+    await delBtns[0].click();
+    const confirmBtn = page.getByRole('button', { name: '\u5220\u9664', exact: true });
+    if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
+    await page.waitForTimeout(1500);
+  }
+}" >/dev/null 2>&1
+sleep 1
+
+# Create a new admin instance with the FIRST image (base-notebook, works in Kind)
+log "  TC-9 setup: 为 admin 创建 base-notebook 开发机..."
+pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+sleep 1
+run_timeout 25 playwright-cli run-code "async page => {
+  await page.getByRole('button', { name: '\u521b\u5efa\u5f00\u53d1\u673a' }).click();
+  await page.waitForSelector('.spec-card', { timeout: 5000 });
+  await page.waitForTimeout(300);
+  await page.locator('.spec-card').first().click();
+  await page.locator('.el-select__wrapper').first().click();
+  await page.waitForSelector('[role=\"option\"]', { timeout: 3000 });
+  // Select the FIRST image option (base-notebook — available in Kind)
+  await page.locator('[role=\"option\"]').first().click();
+  await page.getByRole('button', { name: '\u521b\u5efa', exact: true }).click();
+  await page.waitForTimeout(2000);
+}" >/dev/null 2>&1
+sleep 2
+
+# ── Step 1: Wait for admin's notebook pod to be running ──
+log "  TC-9 setup: 等待 admin 开发机 Pod 就绪（最多 120s）..."
+ADMIN_POD_READY=false
+for i in $(seq 1 24); do
+  STATUS=$(kubectl -n jupyter get pod jupyterlab-admin --no-headers 2>/dev/null | awk '{print $3}' || echo "")
+  READY=$(kubectl -n jupyter get pod jupyterlab-admin --no-headers 2>/dev/null | awk '{print $2}' || echo "")
+  if [[ "$STATUS" == "Running" && "$READY" == "1/1" ]]; then
+    ADMIN_POD_READY=true
+    log "  admin Pod 1/1 Running ✓"
+    break
+  fi
+  log "  ($i/24) 当前状态: $STATUS $READY — 等待5s..."
+  sleep 5
+done
+
+if [[ "$ADMIN_POD_READY" == "false" ]]; then
+  fail "TC-9a: admin 在 /share 创建共享文件" "admin Pod 未就绪，跳过 TC-9"
+  fail "TC-9b: testuser01 Pod 可见 /share 共享文件" "跳过"
+  fail "TC-9c: testuser01 可在 /share 写入文件" "跳过"
+  fail "TC-9d: /share 包含两个用户的文件" "跳过"
+else
+  # ── Step 2: Admin creates a test file in /share ──
+  log "  TC-9a: admin 在 /share 创建共享文件..."
+  ADMIN_WRITE=$(kubectl -n jupyter exec jupyterlab-admin -- /bin/bash -c "echo 'hello from admin' > /share/${SHARE_FILE_ADMIN} && cat /share/${SHARE_FILE_ADMIN}" 2>&1)
+  if [[ "$ADMIN_WRITE" == *"hello from admin"* ]]; then
+    pass "TC-9a: admin 在 /share 创建共享文件成功"
+  else
+    fail "TC-9a: admin 在 /share 创建共享文件" "写入或读取失败: $ADMIN_WRITE"
+  fi
+
+  # ── Step 3: Stop admin's notebook and delete record ──
+  log "  TC-9 setup: 停止 admin 开发机..."
+  pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+  sleep 2
+  pc_code "async page => {
+    const stopBtns = await page.getByRole('button', { name: '\u505c\u6b62' }).all();
+    if (stopBtns.length > 0) {
+      await stopBtns[0].click();
+      try {
+        const msgBox = page.locator('.el-message-box');
+        await msgBox.waitFor({ state: 'visible', timeout: 3000 });
+        await msgBox.getByRole('button', { name: '\u505c\u6b62', exact: true }).click();
+      } catch(e) {}
+    }
+    await page.waitForTimeout(3000);
+  }" >/dev/null 2>&1
+
+  # Wait for instance to stop
+  for i in $(seq 1 12); do
+    pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+    sleep 3
+    STILL_ACTIVE=$(run_timeout 8 playwright-cli run-code "async page => {
+      const body = await page.evaluate(() => document.body.innerText);
+      return (body.includes('\u8fd0\u884c\u4e2d') || body.includes('\u521b\u5efa\u4e2d') || body.includes('\u505c\u6b62\u4e2d')) ? 'true' : 'false';
+    }" 2>/dev/null | get_result)
+    [[ "$STILL_ACTIVE" != "true" ]] && break
+    log "  ($i/12) 等待 admin 实例停止..."
+  done
+
+  # Delete stopped record
+  pc_code "async page => {
+    const delBtns = await page.getByRole('button', { name: '\u5220\u9664\u8bb0\u5f55' }).all();
+    if (delBtns.length > 0) {
+      await delBtns[0].click();
+      const confirmBtn = page.getByRole('button', { name: '\u5220\u9664', exact: true });
+      if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await confirmBtn.click();
+      }
+      await page.waitForTimeout(1500);
+    }
+  }" >/dev/null 2>&1
+  sleep 1
+
+  # ── Step 4: Re-enable testuser01 via API (was disabled in TC-3e) ──
+  log "  TC-9 setup: 重新启用 testuser01..."
+  ENABLE_RESULT=$(run_timeout 10 playwright-cli run-code "async page => {
+    return await page.evaluate(async () => {
+      const token = localStorage.getItem('token') || '';
+      // Get user list to find testuser01's id
+      const lr = await fetch('/api/user', { headers: { 'Authorization': 'Bearer ' + token } });
+      const ld = await lr.json();
+      const list = (ld.data && ld.data.list) ? ld.data.list : [];
+      const user = list.find(u => u.username === 'testuser01');
+      if (!user) return 'user-not-found';
+      // Re-enable (status=1)
+      const ur = await fetch('/api/user/' + user.id + '/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ status: 1 })
+      });
+      const ud = await ur.json();
+      return ud.code === 0 ? 'enabled' : 'enable-failed:' + ud.message;
+    });
+  }" 2>/dev/null | get_result)
+  log "  testuser01 启用结果: ${ENABLE_RESULT:-empty}"
+
+  # ── Step 5: Logout admin ──
+  log "  TC-9 setup: 退出 admin 登录..."
+  pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+  sleep 1
+  run_timeout 25 playwright-cli run-code "async page => {
+    const adminBtn = page.getByRole('button', { name: 'admin' });
+    if (await adminBtn.count() > 0) {
+      await adminBtn.click({ timeout: 3000 }).catch(async () => {
+        await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+      });
+    } else {
+      await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+    }
+    await page.waitForTimeout(500);
+    await page.getByRole('menuitem', { name: '\u9000\u51fa\u767b\u5f55' }).click({ timeout: 5000 });
+    await page.waitForURL('**/login', { timeout: 8000 }).catch(() => {});
+  }" >/dev/null 2>&1
+  sleep 1
+
+  # ── Step 6: Login as testuser01 ──
+  log "  TC-9 setup: 以 testuser01 登录..."
+  pc_goto "$BASE_URL/login" >/dev/null 2>&1
+  sleep 1
+  pc_code "async page => {
+    await page.getByPlaceholder('\u8bf7\u8f93\u5165\u7528\u6237\u540d').fill('$TESTUSER');
+    await page.getByPlaceholder('\u8bf7\u8f93\u5165\u5bc6\u7801').fill('$TESTUSER_PASS');
+    await page.getByRole('button', { name: '\u767b \u5f55' }).click();
+    await page.waitForURL('**/notebooks', { timeout: 8000 });
+  }" >/dev/null 2>&1
+  sleep 2
+
+  # ── Step 7: Create notebook for testuser01 ──
+  log "  TC-9 setup: 为 testuser01 创建开发机..."
+  pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+  sleep 1
+
+  # Clean up any existing stopped/failed instances
+  HAS_OLD=$(run_timeout 8 playwright-cli run-code "async page => {
+    const body = await page.evaluate(() => document.body.innerText);
+    return (body.includes('\u5df2\u505c\u6b62') || body.includes('\u5f02\u5e38')) ? 'true' : 'false';
+  }" 2>/dev/null | get_result)
+  if [[ "$HAS_OLD" == "true" ]]; then
+    pc_code "async page => {
+      const delBtns = await page.getByRole('button', { name: '\u5220\u9664\u8bb0\u5f55' }).all();
+      if (delBtns.length > 0) {
+        await delBtns[0].click();
+        const confirmBtn = page.getByRole('button', { name: '\u5220\u9664', exact: true });
+        if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await confirmBtn.click();
+        }
+        await page.waitForTimeout(1500);
+      }
+    }" >/dev/null 2>&1
+    sleep 1
+    pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+    sleep 1
+  fi
+
+  run_timeout 25 playwright-cli run-code "async page => {
+    await page.getByRole('button', { name: '\u521b\u5efa\u5f00\u53d1\u673a' }).click();
+    await page.waitForSelector('.spec-card', { timeout: 5000 });
+    await page.waitForTimeout(300);
+    await page.locator('.spec-card').first().click();
+    await page.locator('.el-select__wrapper').first().click();
+    await page.waitForSelector('[role=\"option\"]', { timeout: 3000 });
+    await page.locator('[role=\"option\"]').first().click();
+    await page.getByRole('button', { name: '\u521b\u5efa', exact: true }).click();
+    await page.waitForTimeout(2000);
+  }" >/dev/null 2>&1
+  sleep 2
+
+  # ── Step 8: Wait for testuser01's pod to be running ──
+  log "  TC-9 setup: 等待 testuser01 Pod 就绪（最多 120s）..."
+  TESTUSER_POD_READY=false
+  for i in $(seq 1 24); do
+    STATUS=$(kubectl -n jupyter get pod jupyterlab-testuser01 --no-headers 2>/dev/null | awk '{print $3}' || echo "")
+    READY=$(kubectl -n jupyter get pod jupyterlab-testuser01 --no-headers 2>/dev/null | awk '{print $2}' || echo "")
+    if [[ "$STATUS" == "Running" && "$READY" == "1/1" ]]; then
+      TESTUSER_POD_READY=true
+      log "  testuser01 Pod 1/1 Running ✓"
+      break
+    fi
+    log "  ($i/24) 当前状态: $STATUS $READY — 等待5s..."
+    sleep 5
+  done
+
+  if [[ "$TESTUSER_POD_READY" == "false" ]]; then
+    fail "TC-9b: testuser01 Pod 可见 /share 共享文件" "testuser01 Pod 未就绪"
+    fail "TC-9c: testuser01 可在 /share 写入文件" "跳过"
+    fail "TC-9d: /share 包含两个用户的文件" "跳过"
+  else
+    # ── Step 9: Verify /share contains admin's file from testuser01's pod ──
+    log "  TC-9b: 从 testuser01 Pod 验证 /share 共享文件..."
+    USER_READ=$(kubectl -n jupyter exec jupyterlab-testuser01 -- /bin/bash -c "cat /share/${SHARE_FILE_ADMIN}" 2>&1)
+    if [[ "$USER_READ" == *"hello from admin"* ]]; then
+      pass "TC-9b: testuser01 Pod 可见 admin 在 /share 创建的共享文件"
+    else
+      fail "TC-9b: testuser01 Pod 可见 /share 共享文件" "读取失败: $USER_READ"
+    fi
+
+    # ── Step 10: testuser01 creates a file in /share ──
+    log "  TC-9c: testuser01 在 /share 写入文件..."
+    USER_WRITE=$(kubectl -n jupyter exec jupyterlab-testuser01 -- /bin/bash -c "echo 'hello from testuser01' > /share/${SHARE_FILE_USER} && cat /share/${SHARE_FILE_USER}" 2>&1)
+    if [[ "$USER_WRITE" == *"hello from testuser01"* ]]; then
+      pass "TC-9c: testuser01 可在 /share 写入文件"
+    else
+      fail "TC-9c: testuser01 可在 /share 写入文件" "写入或读取失败: $USER_WRITE"
+    fi
+
+    # ── Step 11: Verify both files exist in /share ──
+    log "  TC-9d: 验证 /share 包含两个用户的文件..."
+    BOTH_FILES=$(kubectl -n jupyter exec jupyterlab-testuser01 -- /bin/bash -c "ls /share/${SHARE_FILE_ADMIN} /share/${SHARE_FILE_USER} 2>&1 && echo 'BOTH_EXIST'" 2>&1)
+    if [[ "$BOTH_FILES" == *"BOTH_EXIST"* ]]; then
+      pass "TC-9d: /share 目录同时包含 admin 和 testuser01 的共享文件"
+    else
+      fail "TC-9d: /share 包含两个用户的文件" "文件检查失败: $BOTH_FILES"
+    fi
+
+    # ── Cleanup: remove test files ──
+    kubectl -n jupyter exec jupyterlab-testuser01 -- /bin/bash -c "rm -f /share/${SHARE_FILE_ADMIN} /share/${SHARE_FILE_USER}" 2>/dev/null || true
+  fi
+
+  # ── Cleanup: stop testuser01's notebook ──
+  log "  TC-9 cleanup: 停止 testuser01 开发机..."
+  pc_goto "$BASE_URL/notebooks" >/dev/null 2>&1
+  sleep 1
+  pc_code "async page => {
+    const stopBtns = await page.getByRole('button', { name: '\u505c\u6b62' }).all();
+    if (stopBtns.length > 0) {
+      await stopBtns[0].click();
+      try {
+        const msgBox = page.locator('.el-message-box');
+        await msgBox.waitFor({ state: 'visible', timeout: 3000 });
+        await msgBox.getByRole('button', { name: '\u505c\u6b62', exact: true }).click();
+      } catch(e) {}
+    }
+    await page.waitForTimeout(3000);
+  }" >/dev/null 2>&1
+  sleep 3
+
+  # ── Re-login as admin for any subsequent tests ──
+  log "  TC-9 cleanup: 重新登录 admin..."
+  run_timeout 25 playwright-cli run-code "async page => {
+    const btn = page.getByRole('button', { name: 'testuser01' });
+    if (await btn.count() > 0) {
+      await btn.click({ timeout: 3000 }).catch(async () => {
+        await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+      });
+    } else {
+      await page.locator('.el-header .el-dropdown, .el-header [tabindex=\"0\"]').first().click();
+    }
+    await page.waitForTimeout(500);
+    await page.getByRole('menuitem', { name: '\u9000\u51fa\u767b\u5f55' }).click({ timeout: 5000 });
+    await page.waitForURL('**/login', { timeout: 8000 }).catch(() => {});
+  }" >/dev/null 2>&1
+  sleep 1
+  pc_code "async page => {
+    await page.getByPlaceholder('\u8bf7\u8f93\u5165\u7528\u6237\u540d').fill('$ADMIN_USER');
+    await page.getByPlaceholder('\u8bf7\u8f93\u5165\u5bc6\u7801').fill('$ADMIN_PASS');
+    await page.getByRole('button', { name: '\u767b \u5f55' }).click();
+    await page.waitForURL('**/notebooks', { timeout: 8000 });
+  }" >/dev/null 2>&1
+  sleep 1
+fi
+
 # =============================================================================
 log ""
 log "════════════════════════════════════════════════"
