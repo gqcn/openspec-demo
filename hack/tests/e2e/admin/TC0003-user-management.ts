@@ -2,36 +2,36 @@ import { test, expect } from '../../fixtures/auth'
 import { UserPage } from '../../pages/UserPage'
 import { config } from '../../fixtures/config'
 
-test.describe('TC-3 用户管理', () => {
+test.describe('TC0003 用户管理', () => {
   let userPage: UserPage
 
   test.beforeEach(async ({ adminPage }) => {
     userPage = new UserPage(adminPage)
   })
 
-  test('TC-3a: 页面标题为用户管理', async () => {
+  test('TC0003a: 页面标题为用户管理', async () => {
     await userPage.goto()
     await expect(userPage.page.getByRole('heading', { name: '用户管理' })).toBeVisible()
   })
 
-  test('TC-3b: 包含 admin 用户', async () => {
+  test('TC0003b: 包含 admin 用户', async () => {
     await userPage.goto()
     await expect(userPage.page.getByRole('main').getByText('admin')).toBeVisible()
   })
 
-  test('TC-3c: 用户状态正常', async () => {
+  test('TC0003c: 用户状态正常', async () => {
     await userPage.goto()
     await expect(userPage.page.getByText('正常').first()).toBeVisible()
   })
 
-  test('TC-3d: 创建用户后出现在列表', async () => {
+  test('TC0003d: 创建用户后出现在列表', async () => {
     await userPage.goto()
     await userPage.createUser(config.testUser, config.testUserPass)
     await userPage.goto()
     await expect(userPage.page.getByText(config.testUser)).toBeVisible()
   })
 
-  test('TC-3e: 禁用用户后状态显示禁用', async () => {
+  test('TC0003e: 禁用用户后状态显示禁用', async () => {
     await userPage.goto()
     await userPage.disableUser(config.testUser)
     await userPage.goto()

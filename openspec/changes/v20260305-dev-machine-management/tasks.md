@@ -57,33 +57,33 @@
   → 修复：`tr -d '"\\r'`
 
 - [x] **QA-TS-2** GPU-标准 规格数据在多次运行间可能缺失  
-  → 修复：在 TC-2 前增加自动播种逻辑（检测后按需调 POST /api/spec 创建）
+  → 修复：在 TC0002 前增加自动播种逻辑（检测后按需调 POST /api/spec 创建）
 
-- [x] **QA-TS-3** TC-4d/TC-8c：`localStorage.getItem('token')` 在 Node.js 回调上下文中不可用  
+- [x] **QA-TS-3** TC0004d/TC0008c：`localStorage.getItem('token')` 在 Node.js 回调上下文中不可用  
   → 修复：将 `localStorage` 访问移入 `page.evaluate()` 内（浏览器上下文）
 
-- [x] **QA-TS-4** TC-2f/TC-2g：`getByPlaceholder('如: 4')` 部分匹配命中"如: 4C8G"（规格名称栏），Playwright 严格模式报错  
+- [x] **QA-TS-4** TC0002f/TC0002g：`getByPlaceholder('如: 4')` 部分匹配命中"如: 4C8G"（规格名称栏），Playwright 严格模式报错  
   → 修复：添加 `{ exact: true }` 参数
 
-- [x] **QA-TS-5** TC-3d：创建用户对话框的确认按钮文本为"创建"而非"保存"  
+- [x] **QA-TS-5** TC0003d：创建用户对话框的确认按钮文本为"创建"而非"保存"  
   → 修复：将 `getByRole('button', { name: '保存' })` 改为 `getByRole('button', { name: '创建' })`
 
-- [x] **QA-TS-6** TC-7：退出登录抽屉触发器为 `<span>`，`getByRole('button', { name: 'admin' })` 在部分状态下无法匹配  
+- [x] **QA-TS-6** TC0007：退出登录抽屉触发器为 `<span>`，`getByRole('button', { name: 'admin' })` 在部分状态下无法匹配  
   → 修复：增加 `.el-header .el-dropdown` / `[tabindex="0"]` 备用选择器兜底
 
-- [x] **QA-TS-7** TC-7e/TC-8：`$WRONG_PASS_RESULT）` / `$BTN_ENABLED）` 后紧跟全角字符，bash `set -u` 将 UTF-8 首字节误解析为变量名的一部分，报 unbound variable  
+- [x] **QA-TS-7** TC0007e/TC0008：`$WRONG_PASS_RESULT）` / `$BTN_ENABLED）` 后紧跟全角字符，bash `set -u` 将 UTF-8 首字节误解析为变量名的一部分，报 unbound variable  
   → 修复：改用 `${WRONG_PASS_RESULT}` / `${BTN_ENABLED}` 显式括号
 
-- [x] **QA-TS-8** TC-8（停止确认）：`getByRole('button', { name: '停止', exact: true })` 在对话框打开时命中表行按钮 + 对话框确认按钮，Playwright 严格模式报 StrictModeViolationError，`catch {}` 吞掉错误导致对话框从未被确认，实例永不停止  
+- [x] **QA-TS-8** TC0008（停止确认）：`getByRole('button', { name: '停止', exact: true })` 在对话框打开时命中表行按钮 + 对话框确认按钮，Playwright 严格模式报 StrictModeViolationError，`catch {}` 吞掉错误导致对话框从未被确认，实例永不停止  
   → 修复：范围限定到 `.el-message-box` 后再查找确认按钮
 
-- [x] **QA-TS-9** TC-4/TC-8（创建开发机对话框）：`[class*="select"]` 在点击规格卡片后命中 `.spec-card.selected`（"selected" 含子串 "select"），下拉框未打开，镜像未选择，创建静默失败  
+- [x] **QA-TS-9** TC0004/TC0008（创建开发机对话框）：`[class*="select"]` 在点击规格卡片后命中 `.spec-card.selected`（"selected" 含子串 "select"），下拉框未打开，镜像未选择，创建静默失败  
   → 修复：改用 `.el-select__wrapper` 精确定位镜像下拉触发元素
 
-- [x] **QA-TS-10** TC-8c：断言检查 `body.includes('pytorch-notebook')` 但前端镜像列展示的是 `imageName`（"PyTorch 2.2 + CUDA 12.1"）而非 Docker 镜像 URL  
+- [x] **QA-TS-10** TC0008c：断言检查 `body.includes('pytorch-notebook')` 但前端镜像列展示的是 `imageName`（"PyTorch 2.2 + CUDA 12.1"）而非 Docker 镜像 URL  
   → 修复：改为 `body.includes('pytorch-cuda121') || body.includes('PyTorch')`
 
-- [x] **QA-TS-11** TC-6：分三条独立的 `playwright-cli keydown/press/keyup` 命令触发 Shift+Enter，每次调用均重置键盘状态，实际未发出 Shift+Enter；`wait_for_text` 轮询上限 30 次不足以覆盖新 Pod 内核冷启动  
+- [x] **QA-TS-11** TC0006：分三条独立的 `playwright-cli keydown/press/keyup` 命令触发 Shift+Enter，每次调用均重置键盘状态，实际未发出 Shift+Enter；`wait_for_text` 轮询上限 30 次不足以覆盖新 Pod 内核冷启动  
   → 修复：合并为单一 `run-code` 中的 `page.keyboard.press('Shift+Enter')`；`wait_for_text` 轮询次数从 30 增至 60
 
 ---
@@ -261,7 +261,7 @@
   - 不同镜像创建：选择 PyTorch 镜像创建开发机，实例列表显示正确镜像
   - 停止后清理：停止实例后"删除记录"按钮出现，删除后列表清空，创建按钮恢复可用
 - [ ] **QA-3** 多用户权限隔离验证：用户 A 无法访问用户 B 的 `/home/jovyan`
-- [x] **QA-4** `/share` 目录读写验证：多用户互相可读写（TC-9a~TC-9d）
+- [x] **QA-4** `/share` 目录读写验证：多用户互相可读写（TC0009a~TC0009d）
 - [ ] **QA-5** WebSocket 稳定性验证：JupyterLab kernel 通信、Terminal 长时间连接不断开
 - [ ] **QA-6** 闲置检测联调：mock `last_activity` 超时，验证回收流程
 - [ ] **QA-7** GPU 规格实例创建验证（需 GPU 节点）
@@ -270,54 +270,101 @@
 
 ## 六、测试用例明细
 
-> 测试脚本：`hack/tests/e2e-test.sh`（playwright-cli）
+> 测试文件遵循 `openspec-e2e` 技能规范：每个测试案例一个文件，命名 `TC{NNNN}-{brief-name}.ts`。
 
-| 编号 | 测试用例 | 覆盖 QA | 验证点 |
-|------|---------|---------|--------|
-| TC-1a | 登录后跳转到 /notebooks | QA-1 | 输入凭据后 URL 为 /notebooks |
-| TC-1b | 侧边栏显示管理员菜单 | QA-1 | 页面包含"规格管理"菜单项 |
-| TC-1c | 顶部显示用户名 | QA-1 | 页面包含"admin"用户名 |
-| TC-2a | 规格管理页面标题 | QA-1 | 页面含"规格管理"文本 |
-| TC-2b | CPU-小 规格存在 | QA-1 | 列表包含 CPU-小 |
-| TC-2c | CPU-大 规格存在 | QA-1 | 列表包含 CPU-大 |
-| TC-2d | GPU-标准 规格存在 | QA-1 | 列表包含 GPU-标准 |
-| TC-2e | 规格编辑操作可见 | QA-1 | 列表含"编辑"按钮 |
-| TC-3a | 用户管理页面标题 | QA-1 | 页面含"用户管理"文本 |
-| TC-3b | admin 用户存在 | QA-1 | 列表包含 admin |
-| TC-3c | admin 用户状态正常 | QA-1 | 状态列显示"正常" |
-| TC-4a | 创建开发机记录存在 | QA-2 | 列表包含当前用户名 |
-| TC-4b | 实例状态为创建中或运行中 | QA-2 | status ∈ {创建中, 运行中} |
-| TC-5a | Pod 1/1 Running | QA-2 | kubectl 120s 内 Pod Ready |
-| TC-5b | 前端实例状态运行中 | QA-2 | 页面显示"运行中" |
-| TC-5c | JupyterLab UI 加载成功 | QA-2 | 新标签页 jp-* DOM 元素数量 > 5 |
-| TC-5d | 文件浏览器可见 | QA-2 | .jp-FileBrowser / .jp-BreadCrumbs 元素存在 |
-| TC-6a | 训练代码执行完成 | QA-8 | 输出含 TRAINING_TEST_PASSED |
-| TC-6b | 训练代码无运行错误 | QA-8 | 不含 AssertionError/Traceback |
-| TC-6c | 梯度下降收敛 | QA-8 | 输出包含 Trained: 行（断言通过即 w≈2.0） |
-| TC-7a | 退出登录跳转 /login | QA-1 | URL 变为 /login |
-| TC-7b | 退出成功提示 | QA-1 | 页面含“已退出登录” |
-| TC-7c | 登录表单可见 | QA-1 | 登录按钮文字可见（登 录） |
-| TC-7d | 未登录访问保护路由重定向 | QA-1 | /notebooks → /login |
-| TC-7e | 错误密码登录后留在登录页 | QA-9 | URL 保持 /login，不崩溃 |
-| TC-7f | 错误密码显示错误提示 | QA-9 | Element Plus error toast 出现 |
-| TC-2f | 创建规格后出现在列表 | QA-9 | 新规格 Test-CPU-E2E 在列表可见 |
-| TC-2g | 修改规格 CPU 后更新成功 | QA-9 | 修改后 1000m 可见 |
-| TC-3d | 创建新用户后出现在列表 | QA-9 | testuser01 在用户列表可见 |
-| TC-3e | 禁用用户后状态变更 | QA-9 | testuser01 状态变为禁用 |
-| TC-4c | 有活跃实例时创建按钮禁用 | QA-9 | el-button disabled 属性为 true |
-| TC-4d | API 拒绝重复创建开发机 | QA-9 | 后端返回非 0 code |
-| TC-8a | 停止后删除记录按钮有效 | QA-9 | 已停止实例可通过删除记录按钮清除 |
-| TC-8b | 清除记录后创建按钮可用 | QA-9 | 按钮 disabled 为 false |
-| TC-8c | PyTorch 镜像创建正确 | QA-9 | 列表镜像列显示 'PyTorch' 或 'pytorch-cuda121' |
-| TC-8d | PyTorch 开发机进入创建流程 | QA-9 | 状态为创建中或运行中 |
-| TC-9a | admin 在 /share 创建共享文件 | QA-4 | kubectl exec 写入 /share 成功并可读回 |
-| TC-9b | testuser01 可见 /share 共享文件 | QA-4 | testuser01 Pod 中 cat admin 创建的文件内容正确 |
-| TC-9c | testuser01 可在 /share 写入文件 | QA-4 | testuser01 Pod 中写入 /share 成功并可读回 |
-| TC-9d | /share 包含两个用户的文件 | QA-4 | ls 验证 admin 和 testuser01 的文件同时存在 |
+### E2E — TC0001 登录验证
+- 文件：`hack/tests/e2e/auth/TC0001-login-verification.ts`
 
-> 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅  
-> （初版：PASS=24；后续 Bug 修复后新增 TC-7e/TC-7f、TC-2f/TC-2g、TC-3d/TC-3e、TC-4c/TC-4d、TC-8a~TC-8d 共 12 个，合计 36 个）
-> [HF-1] 新增 TC-9a~TC-9d（多用户 /share 共享目录访问），合计 40 个
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0001a | 登录后跳转到 /notebooks | QA-1 | 输入凭据后 URL 为 /notebooks |
+| TC0001b | 侧边栏显示管理员菜单 | QA-1 | 页面包含"规格管理"菜单项 |
+| TC0001c | 顶部显示用户名 | QA-1 | 页面包含"admin"用户名 |
+
+### E2E — TC0002 规格管理
+- 文件：`hack/tests/e2e/admin/TC0002-spec-management.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0002a | 规格管理页面标题 | QA-1 | 页面含"规格管理"文本 |
+| TC0002b | CPU-小 规格存在 | QA-1 | 列表包含 CPU-小 |
+| TC0002c | CPU-大 规格存在 | QA-1 | 列表包含 CPU-大 |
+| TC0002d | GPU-标准 规格存在 | QA-1 | 列表包含 GPU-标准 |
+| TC0002e | 规格编辑操作可见 | QA-1 | 列表含"编辑"按钮 |
+| TC0002f | 创建规格后出现在列表 | QA-9 | 新规格 Test-CPU-E2E 在列表可见 |
+| TC0002g | 修改规格 CPU 后更新成功 | QA-9 | 修改后 1000m 可见 |
+
+### E2E — TC0003 用户管理
+- 文件：`hack/tests/e2e/admin/TC0003-user-management.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0003a | 用户管理页面标题 | QA-1 | 页面含"用户管理"文本 |
+| TC0003b | admin 用户存在 | QA-1 | 列表包含 admin |
+| TC0003c | admin 用户状态正常 | QA-1 | 状态列显示"正常" |
+| TC0003d | 创建新用户后出现在列表 | QA-9 | testuser01 在用户列表可见 |
+| TC0003e | 禁用用户后状态变更 | QA-9 | testuser01 状态变为禁用 |
+
+### E2E — TC0004 创建开发机
+- 文件：`hack/tests/e2e/notebook/TC0004-create-notebook.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0004a/b | 创建开发机后记录存在且状态正确 | QA-2 | 列表包含用户名，status ∈ {创建中, 运行中} |
+| TC0004c | 有活跃实例时创建按钮禁用 | QA-9 | el-button disabled 属性为 true |
+| TC0004d | API 拒绝重复创建开发机 | QA-9 | 后端返回非 0 code |
+
+### E2E — TC0005 JupyterLab 访问
+- 文件：`hack/tests/e2e/notebook/TC0005-jupyterlab-access.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0005a | Pod 1/1 Running | QA-2 | kubectl 120s 内 Pod Ready |
+| TC0005b | 前端实例状态运行中 | QA-2 | 页面显示"运行中" |
+| TC0005c | JupyterLab UI 加载成功 | QA-2 | 新标签页 jp-* DOM 元素数量 > 5 |
+| TC0005d | 文件浏览器可见 | QA-2 | .jp-FileBrowser / .jp-BreadCrumbs 元素存在 |
+
+### E2E — TC0006 训练代码执行
+- 文件：`hack/tests/e2e/notebook/TC0006-training-execution.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0006a | 训练代码执行完成 | QA-8 | 输出含 TRAINING_TEST_PASSED |
+| TC0006b | 训练代码无运行错误 | QA-8 | 不含 AssertionError/Traceback |
+| TC0006c | 梯度下降收敛 | QA-8 | 输出包含 Trained: 行（断言通过即 w≈2.0） |
+
+### E2E — TC0007 退出登录
+- 文件：`hack/tests/e2e/auth/TC0007-logout.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0007a | 退出登录跳转 /login | QA-1 | URL 变为 /login |
+| TC0007c | 登录表单可见 | QA-1 | 登录按钮文字可见（登 录） |
+| TC0007d | 未登录访问保护路由重定向 | QA-1 | /notebooks → /login |
+| TC0007e | 错误密码登录后留在登录页 | QA-9 | URL 保持 /login，不崩溃 |
+| TC0007f | 错误密码显示错误提示 | QA-9 | Element Plus error toast 出现 |
+
+### E2E — TC0008 不同镜像开发机创建
+- 文件：`hack/tests/e2e/notebook/TC0008-multi-image-notebook.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0008b | 清除记录后创建按钮可用 | QA-9 | 按钮 disabled 为 false |
+| TC0008c/d | PyTorch 镜像创建并显示正确 | QA-9 | 列表镜像列显示 PyTorch 或 pytorch-cuda121，状态为创建中或运行中 |
+
+### E2E — TC0009 多用户共享目录
+- 文件：`hack/tests/e2e/notebook/TC0009-shared-directory.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0009a | admin 在 /share 创建共享文件 | QA-4 | kubectl exec 写入 /share 成功并可读回 |
+| TC0009b | testuser01 可见 /share 共享文件 | QA-4 | testuser01 Pod 中 cat admin 创建的文件内容正确 |
+| TC0009c | testuser01 可在 /share 写入文件 | QA-4 | testuser01 Pod 中写入 /share 成功并可读回 |
+| TC0009d | /share 包含两个用户的文件 | QA-4 | ls 验证 admin 和 testuser01 的文件同时存在 |
+
+> 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅
+> （初版：PASS=24；后续 Bug 修复后新增 TC0007e/TC0007f、TC0002f/TC0002g、TC0003d/TC0003e、TC0004c/TC0004d、TC0008a~TC0008d 共 12 个，合计 36 个）
+> [HF-1] 新增 TC0009a~TC0009d（多用户 /share 共享目录访问），合计 40 个
 
 
 

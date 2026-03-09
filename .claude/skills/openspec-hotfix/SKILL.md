@@ -2,9 +2,9 @@
 name: openspec-hotfix
 description: Organize, fix, and verify bugs, improvements, or gaps reported during manual verification of an OpenSpec change. Use this skill when the user reports bugs, issues, defects, missing test cases, missing coverage, or improvement points after AI implementation. This skill ensures every reported issue is tracked as a task artifact before any fix begins, creating a closed-loop management process.
 license: MIT
-compatibility: Requires openspec CLI. Works with any openspec schema that has a tasks artifact.
+compatibility: Requires openspec CLI. 
 metadata:
-  author: openspec
+  author: gqcn
   version: "1.0"
 ---
 
