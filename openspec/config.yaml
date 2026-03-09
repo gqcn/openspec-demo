@@ -4,10 +4,11 @@ schema: spec-driven
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 # Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Output language: All artifact content must be written in Simplified Chinese,
+  including section titles, descriptions, scenario text, and task items.
+  The only exceptions are: code identifiers, API paths, technical terms with no
+  standard Chinese translation, and RFC keyword markers (SHALL/MUST/SHOULD/GIVEN/WHEN/THEN).
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

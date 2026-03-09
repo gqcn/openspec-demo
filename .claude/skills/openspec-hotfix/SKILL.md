@@ -247,6 +247,7 @@ Then generate the tasks.md in that new change directory.
 - **Verify each fix individually** — Don't batch all fixes and hope for the best
 - **Update tasks.md in real time** — Mark tasks complete immediately after verification, not at the end
 - **Preserve existing task format** — Match the conventions already used in the file
+- **Match the language of the target file** — When appending to or updating an artifact (specs, tasks.md, etc.), use the same natural language as the existing content in that file. If the file is written in Chinese, write in Chinese; if in English, write in English. Do not mix languages within a single file.
 - **Don't over-spec implementation bugs** — If the existing spec already describes the correct behavior and the code simply doesn't follow it, fix the code. Adding redundant spec entries creates noise.
 - **Don't lose context** — If the user's description is detailed, preserve those details in the task record
 
