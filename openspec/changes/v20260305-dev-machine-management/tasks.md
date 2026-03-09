@@ -331,8 +331,6 @@
   - 现象：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
   - 根因：QA-4（/share 目录读写验证：多用户互相可读写）对应的测试用例未实现
   - 影响：无法自动化验证多用户共享文件的核心功能
-  - 修复方案：在 e2e-test.sh 末尾新增 TC-9a~TC-9d 共 4 个测试用例：admin 写文件到 /share → 切换 testuser01 登录创建开发机 → 验证 testuser01 能读到 admin 的文件 → testuser01 写入 /share → 验证双方文件共存
-  - 验证：TC-9a~TC-9d 全部 PASS ✓（PASS=39 FAIL=1，唯一 FAIL 为预已存在的 TC-6b）
 
 ---
 
