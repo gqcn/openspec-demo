@@ -20,6 +20,12 @@ http.interceptors.response.use(
     // GoFrame returns errors as HTTP 200 with non-zero code field.
     // Reject so callers can catch(e) with e.message populated.
     if (response.data?.code !== undefined && response.data.code !== 0) {
+      // GoFrame Auth middleware returns {code: 401} for expired/invalid tokens.
+      if (response.data.code === 401) {
+        const auth = useAuthStore()
+        auth.logout()
+        router.push('/login')
+      }
       return Promise.reject(response.data)
     }
     return response.data

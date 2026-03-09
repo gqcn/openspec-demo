@@ -37,12 +37,12 @@ kubernetes:
 images:
   - key:         "base-notebook"
     name:        "通用 Python 环境"
-    image:       "jupyter/base-notebook:latest"
+    image:       "quay.io/jupyter/base-notebook:latest"
     description: "Python 3.11，含常用科学计算库"
     enabled:     true
   - key:         "pytorch-cuda121"
     name:        "PyTorch 2.2 + CUDA 12.1"
-    image:       "jupyter/pytorch-notebook:latest"
+    image:       "quay.io/jupyter/base-notebook:latest"
     description: "含 PyTorch、torchvision，适用于 GPU 实例"
     enabled:     true
 

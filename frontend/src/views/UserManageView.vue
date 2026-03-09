@@ -11,14 +11,12 @@ const formRef = ref()
 const form = reactive({
   username: '',
   password: '',
-  uid: 10000,
   isAdmin: 0,
 })
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  uid: [{ required: true, message: '请输入 UID', trigger: 'blur' }],
 }
 
 async function fetchList() {
@@ -32,7 +30,7 @@ async function fetchList() {
 }
 
 function openCreate() {
-  Object.assign(form, { username: '', password: '', uid: 10000, isAdmin: 0 })
+  Object.assign(form, { username: '', password: '', isAdmin: 0 })
   showDialog.value = true
 }
 
@@ -51,7 +49,7 @@ async function handleSave() {
 async function handleToggleStatus(user: User) {
   const newStatus = user.status === 1 ? 0 : 1
   const label = newStatus === 1 ? '启用' : '禁用'
-  await ElMessageBox.confirm(`确认${label}用户 "${user.username}" 吗？`, `${label}确认`, { type: 'warning' })
+  await ElMessageBox.confirm(`确认${label}用户 "${user.username}" 吗？`, `${label}确认`, { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' })
   try {
     await updateUserStatus(user.id, newStatus)
     ElMessage.success(`已${label}`)
@@ -116,9 +114,6 @@ onMounted(fetchList)
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password />
-        </el-form-item>
-        <el-form-item label="UID" prop="uid">
-          <el-input-number v-model="form.uid" :min="1000" :max="99999" style="width: 100%" />
         </el-form-item>
         <el-form-item label="角色">
           <el-radio-group v-model="form.isAdmin">

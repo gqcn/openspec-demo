@@ -41,4 +41,17 @@ test.describe('TC0003 用户管理', () => {
     // "禁用" appears as the status text or the enable-toggle button label
     expect(body).toContain('禁用')
   })
+
+  test('TC0003f: 新增用户对话框中不包含 UID 输入字段', async () => {
+    await userPage.goto()
+    await userPage.addButton.click()
+    await userPage.page.waitForSelector('.el-dialog__body', { timeout: 4_000 })
+
+    // The dialog should not contain a UID form item
+    const dialogBody = userPage.page.locator('.el-dialog__body')
+    await expect(dialogBody.getByText('UID')).not.toBeVisible()
+
+    // Close the dialog
+    await userPage.page.getByRole('button', { name: '取消' }).click()
+  })
 })

@@ -1,4 +1,4 @@
-.PHONY: kind-setup kind-teardown kind-status k8s-load dev stop status
+.PHONY: kind-setup kind-teardown kind-status k8s-load k8s-preload dev stop status test
 
 CLUSTER_NAME  := kind-cluster
 NAMESPACE     := jupyter
@@ -27,8 +27,8 @@ dev:
 	@echo "╔══════════════════════════════════════════════╗"
 	@echo "║         AI Training Platform - Dev           ║"
 	@echo "╠══════════════════════════════════════════════╣"
-	@echo "║  前端地址:  http://localhost:$(FRONTEND_PORT)           ║"
-	@echo "║  后端地址:  http://localhost:$(BACKEND_PORT)           ║"
+	@echo "║  前端地址:  http://localhost:$(FRONTEND_PORT)            ║"
+	@echo "║  后端地址:  http://localhost:$(BACKEND_PORT)            ║"
 	@echo "║  后端日志:  /tmp/backend.log                 ║"
 	@echo "║  前端日志:  /tmp/frontend.log                ║"
 	@echo "╚══════════════════════════════════════════════╝"
@@ -55,14 +55,14 @@ status:
 	@echo "║         AI Training Platform - Status        ║"
 	@echo "╠══════════════════════════════════════════════╣"
 	@if lsof -ti :$(BACKEND_PORT) >/dev/null 2>&1; then \
-		echo "║  后端: ✓ 运行中  http://localhost:$(BACKEND_PORT)      ║"; \
+		echo "║  后端: ✓ 运行中  http://localhost:$(BACKEND_PORT)       ║"; \
 	else \
-		echo "║  后端: ✗ 未运行  (端口 $(BACKEND_PORT))                ║"; \
+		echo "║  后端: ✗ 未运行  (端口 $(BACKEND_PORT))                 ║"; \
 	fi
 	@if lsof -ti :$(FRONTEND_PORT) >/dev/null 2>&1; then \
-		echo "║  前端: ✓ 运行中  http://localhost:$(FRONTEND_PORT)     ║"; \
+		echo "║  前端: ✓ 运行中  http://localhost:$(FRONTEND_PORT)       ║"; \
 	else \
-		echo "║  前端: ✗ 未运行  (端口 $(FRONTEND_PORT))               ║"; \
+		echo "║  前端: ✗ 未运行  (端口 $(FRONTEND_PORT))                 ║"; \
 	fi
 	@echo "╠══════════════════════════════════════════════╣"
 	@echo "║  后端日志:  /tmp/backend.log                 ║"
@@ -93,6 +93,50 @@ kind-status:
 ## 用法: make k8s-load IMAGE=myimage:tag
 k8s-load:
 	kind load docker-image --name $(CLUSTER_NAME) $(IMAGE)
+
+# 开发机容器镜像列表（与 backend/manifest/config/config.yaml 中 notebook.images 保持同步）
+NOTEBOOK_IMAGES := quay.io/jupyter/base-notebook:latest
+
+## k8s-preload: 将本地 Docker 中的开发机镜像同步到 Kind 集群（加快 Pod 创建速度，E2E 测试前必须执行）
+k8s-preload:
+	@echo "� 检查 NFS 挂载配置..."
+	@NFS_CURRENT=$$(kubectl -n $(NAMESPACE) get pod -l app=nfs-server \
+	  -o jsonpath='{.items[0].status.podIP}' 2>/dev/null); \
+	NFS_PV=$$(kubectl get pv jupyter-pv -o jsonpath='{.spec.nfs.server}' 2>/dev/null); \
+	if [ -n "$$NFS_CURRENT" ] && [ "$$NFS_CURRENT" != "$$NFS_PV" ]; then \
+		echo "  ⚠️  NFS IP 漂移（PV: $$NFS_PV → 当前: $$NFS_CURRENT），重建 PV/PVC..."; \
+		kubectl -n $(NAMESPACE) get pods --no-headers 2>/dev/null \
+		  | grep -E '^(jupyterlab-|init-home-)' | awk '{print $$1}' \
+		  | xargs -r kubectl -n $(NAMESPACE) delete pod --force --grace-period=0 \
+		    --ignore-not-found 2>/dev/null || true; \
+		kubectl -n $(NAMESPACE) delete pvc pvc-jupyter-shared --ignore-not-found 2>/dev/null || true; \
+		kubectl delete pv jupyter-pv --ignore-not-found 2>/dev/null || true; \
+		sed "s/NFS_SERVER_IP/$$NFS_CURRENT/g" hack/nfs-server.yaml | kubectl apply -f - 2>/dev/null || true; \
+		echo "  ✓ PV/PVC 已重建（NFS: $$NFS_CURRENT）"; \
+	else \
+		echo "  ✓ NFS IP 正常（$$NFS_PV）"; \
+	fi
+	@echo "🧹 清理残留的 Jupyter Pod..."
+	@kubectl -n $(NAMESPACE) get pods --no-headers 2>/dev/null \
+	  | grep -E '^(jupyterlab-|init-home-)' | awk '{print $$1}' \
+	  | xargs -r kubectl -n $(NAMESPACE) delete pod --force --grace-period=0 \
+	    --ignore-not-found 2>/dev/null || true
+	@echo "�🚀 同步开发机镜像到 Kind 集群..."
+	@for image in $(NOTEBOOK_IMAGES); do \
+		if docker image inspect $$image >/dev/null 2>&1; then \
+			echo "  加载 $$image..."; \
+			kind load docker-image --name $(CLUSTER_NAME) $$image; \
+			echo "  ✓ $$image 已加载"; \
+		else \
+			echo "  ⚠️  $$image 在本地 Docker 中不存在，跳过（可先执行: docker pull $$image）"; \
+		fi; \
+	done
+	@echo "✅ 镜像同步完成"
+
+## test: 将开发机镜像预加载到 Kind 集群，然后运行完整 E2E 测试套件
+test: k8s-preload
+	@echo "🧪 运行 E2E 测试套件..."
+	cd hack/tests && npx playwright test
 
 ## db-migrate: 执行数据库初始化 SQL（依赖 MySQL 已启动）
 ## 用法: make db-migrate DSN="root:password@tcp(127.0.0.1:3306)/platform"

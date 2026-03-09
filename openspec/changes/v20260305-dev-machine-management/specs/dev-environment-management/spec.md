@@ -45,15 +45,34 @@ The system SHALL allow the instance owner to restart a running instance. Restart
 - **THEN** a confirmation dialog is shown before the restart API call is made
 
 ### Requirement: User can delete a stopped instance record
-The system SHALL allow a user to delete an instance record that has status `stopped` or `failed`. Deleting SHALL remove the database row permanently.
+The system SHALL allow a user to delete an instance record that has status `stopped` or `failed`. Deleting SHALL remove the database row permanently. For instances with status `failed`, the system SHALL also attempt to clean up any K8S resources (Pod, Service, Ingress) that may still exist in the cluster before removing the database row, since failed instances may have partial or complete K8S resources that were never cleaned up.
 
 #### Scenario: Delete a stopped instance record
 - **WHEN** user requests deletion of an instance with status `stopped`
 - **THEN** system physically deletes the row from the `instances` table and the instance disappears from the list
 
+#### Scenario: Delete a failed instance record cleans up K8S resources
+- **WHEN** user requests deletion of an instance with status `failed`
+- **THEN** system attempts to delete K8S Pod, Service, and Ingress for that instance (best-effort, ignoring not-found errors), then physically deletes the row from the `instances` table
+
 #### Scenario: Delete button only shown for stopped/failed instances
 - **WHEN** the instance list is rendered
 - **THEN** the "delete record" button is visible only for instances with status `stopped` or `failed`
+
+### Requirement: K8S resources are cleaned up when instance creation fails
+The system SHALL clean up any K8S resources (Pod, Service, Ingress) that were created during an instance provisioning attempt when that attempt transitions to `failed` status. This cleanup SHALL be performed as a best-effort operation (ignoring not-found errors) to prevent orphaned K8S resources from persisting in the cluster and consuming compute resources.
+
+#### Scenario: K8S cleanup on Pod creation failure
+- **WHEN** K8S Pod creation fails during instance provisioning
+- **THEN** system attempts to delete the partially-created Pod, Service, and Ingress, and updates instance status to `failed`
+
+#### Scenario: K8S cleanup on Pod entering Failed phase
+- **WHEN** a K8S Pod transitions to `Failed` phase during the creation polling window
+- **THEN** system deletes K8S Pod, Service, and Ingress, and updates instance status to `failed`
+
+#### Scenario: K8S cleanup on provisioning timeout
+- **WHEN** the instance provisioning timeout (5 minutes) expires and the Pod has not reached `Running`
+- **THEN** system deletes K8S Pod, Service, and Ingress, and updates instance status to `failed`
 
 ### Requirement: User can list their instances
 The system SHALL provide an API `GET /api/notebook` that returns the current user's instance list with real-time status merged from K8S Pod state.
@@ -92,11 +111,15 @@ User workspace data SHALL be stored on NFS via a shared PVC (`pvc-jupyter-shared
 - **THEN** previous workspace files are still present under `/home/{username}`
 
 ### Requirement: User directory initialization on first creation
-The system SHALL initialize the user's NFS home directory (`/data/home/{username}`) on first instance creation via a K8S Job running as root. The directory SHALL be owned by the user's UID (`10000 + users.id`) with permissions `chmod 700`.
+The system SHALL initialize the user's NFS home directory (`/data/home/{username}`) on first instance creation via an **initContainer** within the JupyterLab Pod, running as root before the main container starts. The directory SHALL be owned by the user's UID (`10000 + users.id`) with permissions `chmod 700`. The initContainer MUST complete successfully before the main JupyterLab container starts.
 
 #### Scenario: First-time directory creation
 - **WHEN** a user creates their first instance
-- **THEN** the system creates `/data/home/{username}` on NFS, sets ownership to UID/GID = `10000 + users.id`, and sets permissions to 700
+- **THEN** the system creates `/data/home/{username}` on NFS, sets ownership to UID/GID = `10000 + users.id`, and sets permissions to 700, all within the initContainer before JupyterLab starts
+
+#### Scenario: No separate init Pod visible in the cluster
+- **WHEN** a user creates an instance
+- **THEN** only one Pod (`jupyterlab-{username}`) is visible in the namespace; no separate `init-home-*` Pod appears
 
 ### Requirement: User directory permission isolation
 Each user's home directory SHALL be accessible only to that user (chmod 700). NFS UID-based permission SHALL prevent other users from reading or writing to another user's home directory.

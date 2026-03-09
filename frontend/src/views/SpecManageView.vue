@@ -71,7 +71,7 @@ async function handleSave() {
 async function handleToggleStatus(spec: Spec) {
   const newStatus = spec.enabled === 1 ? 0 : 1
   const label = newStatus === 1 ? '启用' : '禁用'
-  await ElMessageBox.confirm(`确认${label}规格 "${spec.name}" 吗？`, `${label}确认`, { type: 'warning' })
+  await ElMessageBox.confirm(`确认${label}规格 "${spec.name}" 吗？`, `${label}确认`, { type: 'warning', confirmButtonText: '确认', cancelButtonText: '取消' })
   try {
     await updateSpec({ id: spec.id, enabled: newStatus })
     ElMessage.success(`已${label}`)
@@ -82,7 +82,7 @@ async function handleToggleStatus(spec: Spec) {
 }
 
 async function handleDelete(spec: Spec) {
-  await ElMessageBox.confirm(`确认删除规格 "${spec.name}" 吗？`, '删除确认', { type: 'error' })
+  await ElMessageBox.confirm(`确认删除规格 "${spec.name}" 吗？`, '删除确认', { type: 'error', confirmButtonText: '确认', cancelButtonText: '取消' })
   try {
     await deleteSpec(spec.id)
     ElMessage.success('已删除')

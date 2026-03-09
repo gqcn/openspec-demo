@@ -1,6 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+/** Decode JWT payload and check whether the token has expired. */
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const payload = JSON.parse(atob(parts[1]))
+    if (!payload.exp) return true
+    return payload.exp * 1000 < Date.now()
+  } catch {
+    return true
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -44,6 +57,10 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (!to.meta.public && !auth.token) {
+    return { name: 'Login' }
+  }
+  if (!to.meta.public && auth.token && isTokenExpired(auth.token)) {
+    auth.logout()
     return { name: 'Login' }
   }
   if (to.meta.adminOnly && !auth.isAdmin) {

@@ -10,6 +10,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
+  testMatch: /TC\d{4}.*\.ts$/,
   fullyParallel: false,           // tests have sequential dependencies (login → create → jupyter)
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

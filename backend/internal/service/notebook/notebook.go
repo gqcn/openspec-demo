@@ -104,18 +104,21 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 	lastId, _ := res.LastInsertId()
 	instanceId := uint(lastId)
 
-	// 7. Init NFS home dir (async – best effort)
+	// 7. Create K8S resources (Pod + Service + Ingress) in background
+	// Note: home dir initialization is handled by the Pod's initContainer.
 	pvcName := g.Cfg().MustGet(ctx, "notebook.pvcName", "pvc-jupyter-shared").String()
 	go func() {
 		bgCtx := context.Background()
-		if e := svcK8s.InitUserHomeDir(bgCtx, username, uid, pvcName); e != nil {
-			g.Log().Warningf(bgCtx, "InitUserHomeDir for %s failed: %v", username, e)
+		// markFailed cleans up any K8S resources that may have been created, then marks
+		// the instance as failed in the DB. Called on all failure paths in this goroutine.
+		markFailed := func(reason string) {
+			g.Log().Errorf(bgCtx, "instance %d (%s) failed: %s — cleaning up K8S resources", instanceId, username, reason)
+			_ = svcK8s.DeleteIngress(bgCtx, token)
+			_ = svcK8s.DeleteService(bgCtx, username)
+			_ = svcK8s.DeletePod(bgCtx, username)
+			_, _ = dao.Instances.Ctx(bgCtx).Where("id", instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
 		}
-	}()
 
-	// 8. Create K8S resources (Pod + Service + Ingress) in background
-	go func() {
-		bgCtx := context.Background()
 		if e := svcK8s.CreatePod(bgCtx, svcK8s.PodOptions{
 			Username:     username,
 			Uid:          uid,
@@ -129,8 +132,7 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 			Tolerations:  sp.Tolerations,
 			PVCName:      pvcName,
 		}); e != nil {
-			g.Log().Errorf(bgCtx, "CreatePod failed for %s: %v", username, e)
-			_, _ = dao.Instances.Ctx(bgCtx).Where("id", instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
+			markFailed(fmt.Sprintf("CreatePod error: %v", e))
 			return
 		}
 		_ = svcK8s.CreateService(bgCtx, username)
@@ -153,12 +155,12 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 				return
 			}
 			if phase == "Failed" {
-				_, _ = dao.Instances.Ctx(bgCtx).Where("id", instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
+				markFailed("Pod entered Failed phase")
 				return
 			}
 		}
-		// Timed out
-		_, _ = dao.Instances.Ctx(context.Background()).Where("id", instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
+		// Timed out waiting for Pod to become Running
+		markFailed("provisioning timeout (5 min)")
 	}()
 
 	// Return immediately with the record
@@ -174,8 +176,19 @@ func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
 		return err
 	}
 
-	// For already-stopped or failed instances, just remove the DB record (K8S resources are already gone).
-	if ins.Status == consts.StatusStopped || ins.Status == consts.StatusFailed {
+	// For stopped instances, K8S resources were already cleaned up during the stop operation.
+	if ins.Status == consts.StatusStopped {
+		_, err = dao.Instances.Ctx(ctx).Where("id", id).Delete()
+		return err
+	}
+
+	// For failed instances, K8S resources may still exist (Pod in Failed/Pending state,
+	// or Service/Ingress created before the failure). Attempt best-effort cleanup to
+	// prevent orphaned resources from persisting in the cluster.
+	if ins.Status == consts.StatusFailed {
+		_ = svcK8s.DeleteIngress(ctx, ins.Token)
+		_ = svcK8s.DeleteService(ctx, ins.Username)
+		_ = svcK8s.DeletePod(ctx, ins.Username)
 		_, err = dao.Instances.Ctx(ctx).Where("id", id).Delete()
 		return err
 	}

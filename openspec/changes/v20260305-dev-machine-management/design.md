@@ -278,13 +278,19 @@ PVC: pvc-jupyter-shared (RWX / NFS)
 
 ### 目录初始化
 
-用户首次创建实例时，后端通过 K8S Job（以 root 运行）初始化用户目录：
+用户首次创建实例时，通过 JupyterLab Pod 的 **initContainer**（以 root 运行）初始化用户目录，initContainer 完成后主容器才启动：
 
 ```bash
-mkdir -p /data/data/home/{username}
-chown {uid}:{uid} /data/data/home/{username}
-chmod 700 /data/data/home/{username}
+mkdir -p /data/home/{username}
+chown -R {uid}:{uid} /data/home/{username}
+chmod 700 /data/home/{username}
+mkdir -p /share && chmod 2777 /share
 ```
+
+相比原先的独立 K8S Job 方案，initContainer 有以下优势：
+- `kubectl get pod` 不再出现 `init-home-*` Pod，集群视图更整洁
+- initContainer 天然保证在主容器启动前完成，消除家目录未就绪的竞态条件
+- 无需管理 Job TTL 和清理逻辑
 
 `/share` 目录在 NFS 服务器初始化时由运维一次性创建，chmod 1777（sticky bit，任何人可写但不能删他人文件）。
 

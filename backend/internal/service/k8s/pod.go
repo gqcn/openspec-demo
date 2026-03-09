@@ -70,6 +70,13 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 	probePath := fmt.Sprintf("/jupyter/%s/lab", opts.Token)
 	probePortVal := probePort(consts.JupyterPort)
 
+	// Init command: create home dir, set ownership and permissions (idempotent)
+	homeDir := fmt.Sprintf("/data/home/%s", opts.Username)
+	initCmd := fmt.Sprintf(
+		"mkdir -p %s && chown -R %d:%d %s && chmod 700 %s && mkdir -p /share && chmod 2777 /share",
+		homeDir, opts.Uid, opts.Uid, homeDir, homeDir,
+	)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -84,6 +91,28 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 			SecurityContext: &corev1.PodSecurityContext{},
 			NodeSelector:    nodeSelector,
 			Tolerations:     tolerations,
+			InitContainers: []corev1.Container{
+				{
+					Name:    "init-home",
+					Image:   "busybox:1.36",
+					Command: []string{"sh", "-c", initCmd},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser: ptrInt64(0),
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "jupyter-shared",
+							MountPath: "/data/home",
+							SubPath:   consts.NFSHomeSubPath,
+						},
+						{
+							Name:      "jupyter-shared",
+							MountPath: "/share",
+							SubPath:   consts.NFSShareSubPath,
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:  "jupyterlab",

@@ -38,7 +38,7 @@ export class UserPage {
         const toggleBtn = row.getByRole('button', { name: '禁用' })
         if (await toggleBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
           await toggleBtn.click()
-          const confirmBtn = this.page.getByRole('button', { name: '确定' })
+          const confirmBtn = this.page.locator('.el-message-box').getByRole('button', { name: '确认' })
           if (await confirmBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
             await confirmBtn.click()
           }

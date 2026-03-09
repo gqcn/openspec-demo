@@ -68,6 +68,7 @@ async function handleRestart(nb: Instance) {
   await ElMessageBox.confirm(`确认重启开发机 "${nb.username}" 吗？`, '重启确认', {
     type: 'warning',
     confirmButtonText: '重启',
+    cancelButtonText: '取消',
   })
   try {
     await restartNotebook(nb.id)
@@ -83,6 +84,7 @@ async function handleDelete(nb: Instance) {
   await ElMessageBox.confirm(`确认停止开发机 "${nb.username}" 吗？`, '停止确认', {
     type: 'warning',
     confirmButtonText: '停止',
+    cancelButtonText: '取消',
   })
   try {
     await deleteNotebook(nb.id)
@@ -98,6 +100,7 @@ async function handlePurge(nb: Instance) {
   await ElMessageBox.confirm(`确认删除记录 "${nb.username}" 吗？此操作不可撤销。`, '删除记录', {
     type: 'error',
     confirmButtonText: '删除',
+    cancelButtonText: '取消',
   })
   try {
     await deleteNotebook(nb.id)

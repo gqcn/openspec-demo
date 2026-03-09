@@ -304,6 +304,7 @@
 | TC0003c | admin 用户状态正常 | QA-1 | 状态列显示"正常" |
 | TC0003d | 创建新用户后出现在列表 | QA-9 | testuser01 在用户列表可见 |
 | TC0003e | 禁用用户后状态变更 | QA-9 | testuser01 状态变为禁用 |
+| TC0003f | 新增用户对话框不含 UID 字段 | FB-4 | 对话框中无 UID 输入项 |
 
 ### E2E — TC0004 创建开发机
 - 文件：`hack/tests/e2e/notebook/TC0004-create-notebook.ts`
@@ -362,22 +363,51 @@
 | TC0009c | testuser01 可在 /share 写入文件 | QA-4 | testuser01 Pod 中写入 /share 成功并可读回 |
 | TC0009d | /share 包含两个用户的文件 | QA-4 | ls 验证 admin 和 testuser01 的文件同时存在 |
 
+### E2E — TC0010 过期/无效 Token 自动跳转登录
+- 文件：`hack/tests/e2e/auth/TC0010-expired-token-redirect.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0010a | 无效 token 访问 /notebooks 后跳转 /login | FB-2 | URL 变为 /login |
+| TC0010b | 跳转后 localStorage token 已清除 | FB-2 | token 为空 |
+| TC0010c | 过期 JWT token 访问后立即跳转 /login | FB-2 | 路由守卫解码 JWT 后跳转 |
+
+### E2E — TC0011 对话框按钮中文化
+- 文件：`hack/tests/e2e/admin/TC0011-dialog-chinese-buttons.ts`
+
+| 编号 | 子断言 | 覆盖 QA | 验证点 |
+|------|--------|---------|--------|
+| TC0011a | 规格管理禁用确认对话框按钮为中文 | FB-3 | 不含 Cancel/OK，含取消 |
+| TC0011b | 规格管理删除确认对话框按钮为中文 | FB-3 | 不含 Cancel/OK，含取消 |
+
 > 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅
 > （初版：PASS=24；后续 Bug 修复后新增 TC0007e/TC0007f、TC0002f/TC0002g、TC0003d/TC0003e、TC0004c/TC0004d、TC0008a~TC0008d 共 12 个，合计 36 个）
 > [HF-1] 新增 TC0009a~TC0009d（多用户 /share 共享目录访问），合计 40 个
+> [HF-2] 新增 TC0003f、TC0010a~TC0010c、TC0011a~TC0011b（Feedback FB-2/3/4 修复验证），合计 46 个
 
 
 
 ---
 
-## 人工验证修复（Hotfix）
+## Feedback
 
-> 本节记录人工验证中发现的问题及修复记录。
+- [x] **FB-1**：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
+- [x] **FB-2**：JWT 过期后访问 /notebooks 等页面仍可正常展示，不会跳转登录页
+  - 修复：在 `frontend/src/router/index.ts` 路由守卫中增加 `isTokenExpired()` 函数，解码 JWT payload 检查 `exp` 字段，过期时清除 auth 状态并跳转 /login
+  - 测试：TC0010a~TC0010c（新增 TC0010c 过期 JWT 场景）
+- [x] **FB-3**：ElMessageBox 确认对话框按钮显示英文 Cancel/OK，应统一为中文
+  - 修复：为 `NotebookListView.vue`、`SpecManageView.vue`、`UserManageView.vue` 中所有 `ElMessageBox.confirm()` 调用显式传入 `confirmButtonText` 和 `cancelButtonText` 中文文本
+  - 测试：TC0011a~TC0011b
+- [x] **FB-4**：新增用户对话框中不应允许编辑 UID，UID 应由后端自动生成
+  - 验证：代码已正确实现——表单无 UID 字段，后端自动生成 uid = 10000 + id
+  - 测试：TC0003f
+- [x] **FB-5**：将 NFS 用户目录初始化从独立 K8S Job（产生 init-home-xxx Pod）改为 jupyterlab Pod 的 initContainer，消除多余 Pod，并解决初始化与主容器启动的竞态条件
+  - 修复：`backend/internal/service/k8s/pod.go` 中为 Pod spec 添加 `init-home` initContainer（busybox:1.36，以 root 运行，执行 mkdir/chown/chmod）
+  - 修复：`backend/internal/service/notebook/notebook.go` 移除 `InitUserHomeDir` goroutine（步骤 7）
+  - 修复：删除 `backend/internal/service/k8s/nfs_init.go`（K8S Job 逻辑不再需要）
+  - 测试：无需新增 E2E 用例，现有 TC0004/TC0008 开发机创建流程覆盖；此为内部架构改进，`kubectl get pod` 不再出现 `init-home-*`
 
-- [x] **HF-1** `hack/tests/e2e-test.sh`：缺少多用户 /share 共享目录访问测试用例
-  - 现象：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
-  - 根因：QA-4（/share 目录读写验证：多用户互相可读写）对应的测试用例未实现
-  - 影响：无法自动化验证多用户共享文件的核心功能
+- [ ] **FB-6**：开发机创建异常时（CreatePod 失败、Pod 进入 Failed 状态、超时），删除 failed 状态记录不会清理 K8S 中已创建的 Pod/Service/Ingress，造成集群脏数据持续占用资源
 
 ---
 

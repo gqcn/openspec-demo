@@ -12,7 +12,6 @@ export interface User {
 export interface CreateUserReq {
   username: string
   password: string
-  uid: number
   isAdmin: number
 }
 
