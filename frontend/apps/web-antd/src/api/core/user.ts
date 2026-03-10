@@ -1,46 +1,22 @@
-import { requestClient } from '#/api/request';
+import type { UserInfo } from '@vben/types';
 
-export interface Role {
-  dataScope: string;
-  flag: boolean;
-  roleId: number;
-  roleKey: string;
-  roleName: string;
-  roleSort: number;
-  status: string;
-  superAdmin: boolean;
-}
-
-export interface User {
-  avatar: string;
-  createTime: string;
-  deptId: number;
-  deptName: string;
-  email: string;
-  loginDate: string;
-  loginIp: string;
-  nickName: string;
-  phonenumber: string;
-  remark: string;
-  roles: Role[];
-  sex: string;
-  status: string;
-  tenantId: string;
-  userId: number;
-  userName: string;
-  userType: string;
-}
-
-export interface UserInfoResp {
-  permissions: string[];
-  roles: string[];
-  user: User;
-}
+import type { AuthApi } from './auth';
 
 /**
- * 获取用户信息
- * 存在返回null的情况(401) 不会抛出异常 需要手动抛异常
+ * Transform backend user data to Vben UserInfo format
  */
-export async function getUserInfoApi() {
-  return requestClient.get<null | UserInfoResp>('/system/user/getInfo');
+export function transformUserInfo(
+  userData: AuthApi.LoginResult,
+): UserInfo {
+  return {
+    userId: userData.userId,
+    username: userData.username,
+    realName: userData.username,
+    avatar: '',
+    desc: '',
+    roles: userData.isAdmin
+      ? [{ roleName: 'admin', value: 'admin' }]
+      : [{ roleName: 'user', value: 'user' }],
+    homePath: '/notebooks',
+  };
 }
