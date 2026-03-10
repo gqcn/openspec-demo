@@ -25,7 +25,7 @@ dev:
 	@cd $(BACKEND_DIR) && ./bin/platform >> /tmp/backend.log 2>&1 & echo $$! > $(BACKEND_PID)
 	@sleep 1
 	@# ── 启动前端 ────────────────────────────────────────────────
-	@cd $(FRONTEND_DIR) && npx vite --port $(FRONTEND_PORT) --strictPort >> /tmp/frontend.log 2>&1 & echo $$! > $(FRONTEND_PID)
+	@cd $(FRONTEND_DIR) && npx turbo run dev --filter=@vben/web-antd >> /tmp/frontend.log 2>&1 & echo $$! > $(FRONTEND_PID)
 	@sleep 2
 	@echo ""
 	@echo "╔══════════════════════════════════════════════╗"
