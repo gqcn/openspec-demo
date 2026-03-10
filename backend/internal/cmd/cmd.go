@@ -55,7 +55,7 @@ func run(ctx context.Context, _ *gcmd.Parser) error {
 				controllerNotebook.NewV1(notebookSvc, specSvc, imageSvc, bizCtxSvc),
 				controllerImage.NewV1(imageSvc),
 				controllerSpec.NewV1(specSvc, bizCtxSvc),
-				controllerUser.NewV1(userSvc),
+				controllerUser.NewV1(userSvc, bizCtxSvc),
 			)
 		})
 	})

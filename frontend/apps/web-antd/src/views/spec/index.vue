@@ -51,8 +51,8 @@ async function handleToggle(record: Spec) {
     await specUpdate({ id: record.id, enabled: newEnabled });
     message.success(newEnabled === 1 ? '已启用' : '已禁用');
     gridApi.query();
-  } catch (e: any) {
-    message.error(e?.message || '操作失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 
@@ -61,8 +61,8 @@ async function handleDelete(record: Spec) {
     await specDelete(record.id);
     message.success('已删除');
     gridApi.query();
-  } catch (e: any) {
-    message.error(e?.message || '删除失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 

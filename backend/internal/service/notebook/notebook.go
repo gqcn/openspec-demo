@@ -4,6 +4,7 @@ package notebook
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/errors/gcode"
@@ -141,7 +142,7 @@ func (s *Service) Create(ctx context.Context, userId uint, username string, uid 
 			Token:        token,
 			Image:        imgCfg.Image,
 			Cpu:          sp.Cpu,
-			Memory:       sp.Memory,
+			Memory:       memoryWithUnit(sp.Memory),
 			Gpu:          sp.Gpu,
 			GpuType:      sp.GpuType,
 			NodeSelector: sp.NodeSelector,
@@ -275,7 +276,7 @@ func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) er
 			Token:        ins.Token,
 			Image:        imgCfg.Image,
 			Cpu:          sp.Cpu,
-			Memory:       sp.Memory,
+			Memory:       memoryWithUnit(sp.Memory),
 			Gpu:          sp.Gpu,
 			GpuType:      sp.GpuType,
 			NodeSelector: sp.NodeSelector,
@@ -308,6 +309,15 @@ func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) er
 		_, _ = dao.Instances.Ctx(context.Background()).Where(cols.Id, id).Data(do.Instance{Status: consts.StatusFailed}).Update()
 	}()
 	return nil
+}
+
+// memoryWithUnit ensures the memory value has a "Gi" suffix for K8S resource parsing.
+// If the value already ends with "Gi", it is returned as-is (backward compatibility).
+func memoryWithUnit(mem string) string {
+	if strings.HasSuffix(mem, "Gi") {
+		return mem
+	}
+	return mem + "Gi"
 }
 
 // AccessURL builds the full public URL for an instance.

@@ -312,6 +312,15 @@
   - 修复：`spec/spec.go` 的 `List`、`ListAll`、`ListAllUnpaged` 三个方法 `OrderAsc(cols.SortOrder)` 改为 `OrderAsc(cols.Id)`
 - [x] **FB-30**：用户列表和规格列表的常见列缺少点击排序功能
   - 修复：`user/data.ts` 和 `spec/data.ts` 常见列添加 `sortable: true`
+- [x] **FB-31**：API 错误时页面弹出 2 条重复错误提示，去掉组件级 catch 中的 `message.error()`，统一由请求拦截器处理
+  - 修复：`user-drawer.vue`、`spec-drawer.vue`、`user/index.vue`、`spec/index.vue`、`notebook/create-modal.vue`、`notebook/index.vue` 共 10 处 catch 块中的 `message.error()` 改为空 catch，错误统一由 `request.ts` 拦截器处理
+  - 测试：TC0021a（创建重复用户名只弹 1 条提示）
+- [x] **FB-32**：用户管理中，当前登录用户不能禁用和删除自己（前后端均需校验）
+  - 修复：后端 `user_v1_handlers.go` 的 `UpdateStatus` 和 `Delete` 方法中增加当前用户 ID 校验，`user.go` controller 注入 `bizCtxSvc`；前端 `user/index.vue` 引入 `useUserStore` 获取 `currentUserId`，对当前用户隐藏禁用和删除按钮
+  - 测试：TC0021b~TC0021e, TC0021i（前端隐藏按钮 + 后端拒绝自我操作 + 其他用户按钮正常）
+- [x] **FB-33**：规格管理中 CPU 单位为 Cores、内存单位为 Gi：前端表格列标题加单位标注，表单输入仅接受数字（内存支持 1 位小数），DB 只存纯数字不含单位，后端创建 Pod 时拼接 "Gi" 后缀
+  - 修复：前端 `spec/data.ts` 列标题改为 `CPU (Cores)` / `内存 (Gi)`，memory 表单改为 `InputNumber`（min=0.1, step=0.1, precision=1）；`spec-drawer.vue` 编辑时去掉旧数据 "Gi" 后缀、提交时转 string；`notebook/create-modal.vue` 展示加单位；后端 `notebook.go` 新增 `memoryWithUnit()` 函数，创建 Pod 时拼接 "Gi"（兼容旧数据）；`init.sql` 注释更新
+  - 测试：TC0021f~TC0021h（列标题单位展示 + 内存 InputNumber 组件）
 
 ---
 

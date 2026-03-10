@@ -12,5 +12,6 @@ backend/bin/
 .playwright-mcp/
 **/node_modules/
 **/dist/
+**/dist.zip
 **/.turbo/
 *.tar.zst

@@ -3,6 +3,8 @@ package user
 import (
 	"context"
 
+	"github.com/gogf/gf/v2/errors/gcode"
+	"github.com/gogf/gf/v2/errors/gerror"
 	v1 "github.com/gqcn/platform/backend/api/user/v1"
 )
 
@@ -42,6 +44,9 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (res *v1.ListR
 
 // UpdateStatus handles PUT /api/user/{id}/status — admin enable/disable user.
 func (c *ControllerV1) UpdateStatus(ctx context.Context, req *v1.UpdateStatusReq) (res *v1.UpdateStatusRes, err error) {
+	if u := c.bizCtxSvc.GetContextUser(ctx); u != nil && u.Id == req.Id {
+		return nil, gerror.NewCode(gcode.CodeBusinessValidationFailed, "不能禁用或启用自己的账号")
+	}
 	return &v1.UpdateStatusRes{}, c.userSvc.UpdateStatus(ctx, req.Id, req.Status)
 }
 
@@ -52,5 +57,8 @@ func (c *ControllerV1) Update(ctx context.Context, req *v1.UpdateReq) (res *v1.U
 
 // Delete handles DELETE /api/user/{id} — admin soft-deletes a user.
 func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (res *v1.DeleteRes, err error) {
+	if u := c.bizCtxSvc.GetContextUser(ctx); u != nil && u.Id == req.Id {
+		return nil, gerror.NewCode(gcode.CodeBusinessValidationFailed, "不能删除自己的账号")
+	}
 	return &v1.DeleteRes{}, c.userSvc.Delete(ctx, req.Id)
 }

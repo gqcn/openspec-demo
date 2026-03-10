@@ -49,8 +49,8 @@ const [Drawer, drawerApi] = useVbenDrawer({
       }
       emit('reload');
       drawerApi.close();
-    } catch (e: any) {
-      message.error(e?.message || '操作失败');
+    } catch {
+      // 错误已由请求拦截器统一提示
     } finally {
       drawerApi.setState({ confirmLoading: false });
     }

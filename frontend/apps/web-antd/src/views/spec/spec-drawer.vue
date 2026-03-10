@@ -34,6 +34,10 @@ const [Drawer, drawerApi] = useVbenDrawer({
     drawerApi.setState({ confirmLoading: true });
     try {
       const values = await formApi.getValues();
+      // memory 从 InputNumber 获取的是数字，转为字符串供后端存储
+      if (values.memory !== undefined && values.memory !== null) {
+        values.memory = String(values.memory);
+      }
       if (isUpdate.value) {
         await specUpdate({ id: recordData.value!.id, ...values });
         message.success('更新成功');
@@ -43,8 +47,8 @@ const [Drawer, drawerApi] = useVbenDrawer({
       }
       emit('reload');
       drawerApi.close();
-    } catch (e: any) {
-      message.error(e?.message || '操作失败');
+    } catch {
+      // 错误已由请求拦截器统一提示
     } finally {
       drawerApi.setState({ confirmLoading: false });
     }
@@ -54,7 +58,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
       const data = drawerApi.getData<Record<string, any>>();
       if (data && data.id) {
         recordData.value = data;
-        formApi.setValues(data);
+        // 兼容旧数据：memory 可能存储为 "8Gi"，去掉 Gi 后缀转为数字
+        const formData = { ...data };
+        if (typeof formData.memory === 'string') {
+          formData.memory = Number.parseFloat(formData.memory.replace(/Gi$/i, ''));
+        }
+        formApi.setValues(formData);
       } else {
         recordData.value = null;
       }

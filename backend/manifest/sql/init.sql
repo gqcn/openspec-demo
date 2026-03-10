@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `specs` (
   `name`          VARCHAR(64)  NOT NULL                           COMMENT '套餐名称，如: CPU-小, GPU-标准',
   `description`   VARCHAR(256) DEFAULT NULL                       COMMENT '套餐描述',
   `cpu`           VARCHAR(16)  NOT NULL                           COMMENT 'CPU 规格（K8S 格式），如: 4',
-  `memory`        VARCHAR(16)  NOT NULL                           COMMENT '内存规格（K8S 格式），如: 16Gi',
+  `memory`        VARCHAR(16)  NOT NULL                           COMMENT '内存规格（纯数字，单位 Gi），如: 16',
   `gpu`           VARCHAR(8)   NOT NULL DEFAULT '0'               COMMENT 'GPU 数量，0 表示不使用 GPU',
   `gpu_type`      VARCHAR(64)  DEFAULT NULL                       COMMENT 'GPU 资源类型，如: nvidia.com/gpu',
   `node_selector` JSON         DEFAULT NULL                       COMMENT 'K8S nodeSelector，用于 GPU 节点亲和',

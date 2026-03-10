@@ -36,8 +36,8 @@ const [Modal, modalApi] = useVbenModal({
       message.success('开发机创建中，请稍候...');
       emit('reload');
       modalApi.close();
-    } catch (e: any) {
-      message.error(e?.message || '创建失败');
+    } catch {
+      // 错误已由请求拦截器统一提示
     } finally {
       modalApi.setState({ confirmLoading: false });
     }
@@ -83,8 +83,10 @@ onMounted(async () => {
               {{ spec.name }}
             </div>
             <div style="margin-top: 6px; color: #606266; font-size: 13px">
-              <span>CPU: {{ spec.cpu }}</span>
-              <span style="margin: 0 8px">内存: {{ spec.memory }}</span>
+              <span>CPU: {{ spec.cpu }} Cores</span>
+              <span style="margin: 0 8px"
+                >内存: {{ String(spec.memory).replace(/Gi$/i, '') }} Gi</span
+              >
             </div>
             <div
               v-if="spec.gpu > 0"

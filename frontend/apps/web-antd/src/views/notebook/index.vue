@@ -98,8 +98,8 @@ async function handleRestart(record: Instance) {
     message.success('已发起重启');
     await fetchList();
     watchPolling();
-  } catch (e: any) {
-    message.error(e?.message || '操作失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 
@@ -109,8 +109,8 @@ async function handleStop(record: Instance) {
     message.success('已停止');
     await fetchList();
     watchPolling();
-  } catch (e: any) {
-    message.error(e?.message || '操作失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 
@@ -119,8 +119,8 @@ async function handlePurge(record: Instance) {
     await notebookDelete(record.id);
     message.success('记录已删除');
     await fetchList();
-  } catch (e: any) {
-    message.error(e?.message || '操作失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 

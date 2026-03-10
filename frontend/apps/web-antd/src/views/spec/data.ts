@@ -13,8 +13,8 @@ export const querySchema: FormSchemaGetter = () => [
 export const columns: VxeGridPropTypes.Columns = [
   { field: 'id', title: 'ID', minWidth: 60, sortable: true },
   { field: 'name', title: '名称', minWidth: 160, sortable: true },
-  { field: 'cpu', title: 'CPU', minWidth: 100, sortable: true },
-  { field: 'memory', title: '内存', minWidth: 100, sortable: true },
+  { field: 'cpu', title: 'CPU (Cores)', minWidth: 120, sortable: true },
+  { field: 'memory', title: '内存 (Gi)', minWidth: 120, sortable: true },
   { field: 'gpu', title: 'GPU 数量', minWidth: 90, sortable: true },
   { field: 'gpuType', title: 'GPU 型号', minWidth: 140 },
   { field: 'enabled', title: '状态', minWidth: 90, sortable: true, slots: { default: 'status' } },
@@ -47,19 +47,23 @@ export const drawerSchema: FormSchemaGetter = () => [
   {
     component: 'Input',
     fieldName: 'cpu',
-    label: 'CPU',
+    label: 'CPU (Cores)',
     rules: 'required',
     componentProps: {
       placeholder: '如: 4',
     },
   },
   {
-    component: 'Input',
+    component: 'InputNumber',
     fieldName: 'memory',
-    label: '内存',
+    label: '内存 (Gi)',
     rules: 'required',
     componentProps: {
-      placeholder: '如: 8Gi',
+      placeholder: '如: 8',
+      min: 0.1,
+      step: 0.1,
+      precision: 1,
+      style: { width: '100%' },
     },
   },
   {

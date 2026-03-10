@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { Page, useVbenDrawer } from '@vben/common-ui';
+import { useUserStore } from '@vben/stores';
 
 import { Button, message, Popconfirm, Tag } from 'ant-design-vue';
 
@@ -13,6 +14,9 @@ import {
 
 import { columns } from './data';
 import UserDrawer from './user-drawer.vue';
+
+const userStore = useUserStore();
+const currentUserId = userStore.userInfo?.userId;
 
 const [UserDrawerComp, userDrawerApi] = useVbenDrawer({
   connectedComponent: UserDrawer,
@@ -56,8 +60,8 @@ async function handleToggleStatus(record: User) {
     await userStatusChange(record.id, newStatus);
     message.success(newStatus === 1 ? '已启用' : '已禁用');
     gridApi.query();
-  } catch (e: any) {
-    message.error(e?.message || '操作失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 
@@ -66,8 +70,8 @@ async function handleDelete(record: User) {
     await userDelete(record.id);
     message.success('用户已删除');
     gridApi.query();
-  } catch (e: any) {
-    message.error(e?.message || '删除失败');
+  } catch {
+    // 错误已由请求拦截器统一提示
   }
 }
 
@@ -100,6 +104,7 @@ function onReload() {
           编辑
         </Button>
         <Popconfirm
+          v-if="row.id !== currentUserId"
           :title="`确认${row.status === 1 ? '禁用' : '启用'}用户 &quot;${row.username}&quot; 吗？`"
           @confirm="handleToggleStatus(row)"
         >
@@ -108,6 +113,7 @@ function onReload() {
           </Button>
         </Popconfirm>
         <Popconfirm
+          v-if="row.id !== currentUserId"
           title="确认删除该用户吗？该操作不可撤销"
           @confirm="handleDelete(row)"
         >
