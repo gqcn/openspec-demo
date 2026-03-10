@@ -52,6 +52,16 @@ export class NotebookPage {
     await this.page.waitForTimeout(3_000)
   }
 
+  /** Restart the running notebook and confirm dialog. */
+  async restartNotebook() {
+    const restartBtn = this.page.getByRole('button', { name: '重启' }).first()
+    await restartBtn.click()
+    const msgBox = this.page.locator('.el-message-box')
+    await msgBox.waitFor({ state: 'visible', timeout: 3_000 })
+    await msgBox.getByRole('button', { name: '重启', exact: true }).click()
+    await this.page.waitForTimeout(3_000)
+  }
+
   /** Delete stopped/failed notebook record. */
   async deleteRecord() {
     await this.deleteRecordButton.click()

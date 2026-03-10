@@ -3,9 +3,7 @@ package notebook
 import (
 	"context"
 
-	"github.com/gogf/gf/v2/net/ghttp"
 	v1 "github.com/gqcn/platform/backend/api/notebook/v1"
-	"github.com/gqcn/platform/backend/internal/consts"
 	"github.com/gqcn/platform/backend/internal/model"
 	svcImage "github.com/gqcn/platform/backend/internal/service/image"
 	svcNotebook "github.com/gqcn/platform/backend/internal/service/notebook"
@@ -14,7 +12,7 @@ import (
 
 // currentUser extracts the authenticated user from context (set by Auth middleware).
 func currentUser(ctx context.Context) *model.ContextUser {
-	return ghttp.RequestFromCtx(ctx).GetCtxVar(consts.ContextKeyUser).Val().(*model.ContextUser)
+	return model.GetContextUser(ctx)
 }
 
 // List handles GET /api/notebook.

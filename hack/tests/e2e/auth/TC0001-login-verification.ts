@@ -17,4 +17,16 @@ test.describe('TC0001 登录验证', () => {
   test('TC0001c: 顶部显示用户名', async ({ adminPage }) => {
     await expect(adminPage.getByText('admin')).toBeVisible()
   })
+
+  test('TC0001d: 登录页 title 显示"登录 — AI 训练平台"', async ({ page }) => {
+    const loginPage = new LoginPage(page)
+    await loginPage.goto()
+    expect(await page.title()).toBe('登录 — AI 训练平台')
+  })
+
+  test('TC0001e: 开发机页 title 显示"我的开发机 — AI 训练平台"', async ({ adminPage }) => {
+    await adminPage.goto('/notebooks')
+    await adminPage.waitForLoadState('networkidle')
+    expect(await adminPage.title()).toBe('我的开发机 — AI 训练平台')
+  })
 })

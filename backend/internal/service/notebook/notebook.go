@@ -108,7 +108,9 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 	// Note: home dir initialization is handled by the Pod's initContainer.
 	pvcName := g.Cfg().MustGet(ctx, "notebook.pvcName", "pvc-jupyter-shared").String()
 	go func() {
-		bgCtx := context.Background()
+		// context.WithoutCancel inherits trace/metadata from the request context without
+		// being cancelled when the HTTP request completes, satisfying GoFrame observability best practices.
+		bgCtx := context.WithoutCancel(ctx)
 		// markFailed cleans up any K8S resources that may have been created, then marks
 		// the instance as failed in the DB. Called on all failure paths in this goroutine.
 		markFailed := func(reason string) {

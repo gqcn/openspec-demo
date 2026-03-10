@@ -16,4 +16,5 @@ type User struct {
 	Email        interface{}
 	IsAdmin      interface{}
 	Status       interface{}
+	DeletedAt    interface{}
 }

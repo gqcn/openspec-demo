@@ -27,12 +27,13 @@ type ListReq struct {
 
 // UserItem represents a single user in list.
 type UserItem struct {
-	Id       uint   `json:"id"`
-	Username string `json:"username"`
-	Uid      uint   `json:"uid"`
-	Email    string `json:"email"`
-	IsAdmin  uint   `json:"isAdmin"`
-	Status   uint   `json:"status"`
+	Id        uint   `json:"id"`
+	Username  string `json:"username"`
+	Uid       uint   `json:"uid"`
+	Email     string `json:"email"`
+	IsAdmin   uint   `json:"isAdmin"`
+	Status    uint   `json:"status"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // ListRes defines the user list response.
@@ -50,3 +51,23 @@ type UpdateStatusReq struct {
 
 // UpdateStatusRes defines the update user status response.
 type UpdateStatusRes struct{}
+
+// UpdateReq defines the update user request (admin only) — role and/or password.
+type UpdateReq struct {
+	g.Meta   `path:"/user/{id}" method:"put" tags:"User" summary:"修改用户信息（管理员）"`
+	Id       uint   `json:"id"       in:"path" v:"required"`
+	IsAdmin  *uint  `json:"isAdmin"`
+	Password string `json:"password"`
+}
+
+// UpdateRes defines the update user response.
+type UpdateRes struct{}
+
+// DeleteReq defines the delete user request (admin only) — soft delete.
+type DeleteReq struct {
+	g.Meta `path:"/user/{id}" method:"delete" tags:"User" summary:"软删除用户（管理员）"`
+	Id     uint `json:"id" in:"path" v:"required"`
+}
+
+// DeleteRes defines the delete user response.
+type DeleteRes struct{}

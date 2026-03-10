@@ -17,4 +17,5 @@ type User struct {
 	Status       uint        `json:"status"       orm:"status"        description:"账号状态：1=正常 0=禁用"`
 	CreatedAt    *gtime.Time `json:"createdAt"    orm:"created_at"`
 	UpdatedAt    *gtime.Time `json:"updatedAt"    orm:"updated_at"`
+	DeletedAt    *gtime.Time `json:"deletedAt"    orm:"deleted_at"    description:"软删除时间，由ORM自动维护"`
 }

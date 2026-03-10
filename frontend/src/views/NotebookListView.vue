@@ -38,7 +38,7 @@ async function fetchList() {
 }
 
 function needsPolling(list: Instance[]) {
-  return list.some((n) => n.status === 'creating' || n.status === 'stopping')
+  return list.some((n) => n.status === 'creating' || n.status === 'running' || n.status === 'stopping')
 }
 
 function startPoll() {

@@ -54,4 +54,75 @@ test.describe('TC0003 用户管理', () => {
     // Close the dialog
     await userPage.page.getByRole('button', { name: '取消' }).click()
   })
+
+  test('TC0003g: 用户名格式不合法时前端显示校验错误且不调用 API', async () => {
+    await userPage.goto()
+    await userPage.addButton.click()
+    await userPage.page.waitForSelector('.el-dialog__body', { timeout: 4_000 })
+
+    const dialog = userPage.page.locator('.el-dialog__body')
+
+    // Fill an invalid username (pure numeric — fails Linux username rules)
+    await userPage.usernameInput.fill('123')
+    await userPage.usernameInput.blur()
+
+    // Frontend validation error should appear
+    const errMsg = dialog.locator('.el-form-item__error')
+    await expect(errMsg).toBeVisible({ timeout: 3_000 })
+    const errText = await errMsg.innerText()
+    expect(errText.length).toBeGreaterThan(0)
+
+    // Clicking "创建" should NOT dismiss the dialog (API not called, dialog stays open)
+    await userPage.page.getByRole('button', { name: '创建' }).click()
+    await expect(userPage.page.locator('.el-dialog')).toBeVisible()
+
+    // Close the dialog
+    await userPage.page.getByRole('button', { name: '取消' }).click()
+  })
+
+  test('TC0003h: 用户名格式不合法时后端返回错误（纯数字、含大写、含空格）', async () => {
+    const invalidNames = ['123', 'UserName', 'user name']
+    for (const name of invalidNames) {
+      // Attempt creation via UI — dialog validation should block before API, but
+      // we also verify backend rejects it by calling the API helper directly.
+      const resp = await userPage.page.evaluate(async (username) => {
+        const token = localStorage.getItem('token') ?? ''
+        const r = await fetch('/api/user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ username, password: 'Test@123456', isAdmin: 0 }),
+        })
+        return r.json()
+      }, name)
+      expect(resp.code, `Backend should reject username "${name}"`).not.toBe(0)
+    }
+
+    // A valid username should succeed
+    const validName = `e2etest_${Date.now()}`.slice(0, 32)
+    const resp = await userPage.page.evaluate(async (username) => {
+      const token = localStorage.getItem('token') ?? ''
+      const r = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ username, password: 'Test@123456', isAdmin: 0 }),
+      })
+      return r.json()
+    }, validName)
+    expect(resp.code, `Backend should accept valid username "${validName}"`).toBe(0)
+
+    // Cleanup: disable the created test user (best-effort)
+    await userPage.goto()
+    await userPage.disableUser(validName)
+  })
+
+  test('TC0003i: 用户列表创建时间列有数据', async ({ adminPage }) => {
+    const userPage = new UserPage(adminPage)
+    await userPage.goto()
+    // admin user should always exist — verify its createdAt is non-empty
+    const rows = adminPage.locator('tr')
+    const adminRow = rows.filter({ hasText: 'admin' })
+    const createdAtCell = adminRow.locator('td').nth(5) // "创建时间" column (0-indexed: id,username,uid,role,status,createdAt)
+    const text = await createdAtCell.innerText()
+    expect(text.trim()).toMatch(/\d{4}-\d{2}-\d{2}/)
+  })
 })

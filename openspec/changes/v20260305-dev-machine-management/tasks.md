@@ -6,49 +6,6 @@
 
 ---
 
-## 零、缺陷修复（Bug Fixes）
-
-> 本节记录事后发现并修复的问题，不改变原始需求任务编号。
-
-- [x] **BUG-1** `frontend/src/api/http.ts`：修复 Axios 响应拦截器未检查 GoFrame 错误码  
-  - 根因：GoFrame 所有错误以 HTTP 200 + `{ code: X, message: "...", data: null }` 返回，原拦截器无 code 检查，导致错误响应被视为成功  
-  - 影响：登录失败崩溃（`Cannot read properties of undefined (reading 'token')`）、规格创建/修改静默失败  
-  - 修复：在 success interceptor 中加入 `if (response.data?.code !== 0) return Promise.reject(response.data)` 判断
-
-- [x] **BUG-2** `backend/internal/service/spec/spec.go`：`Update` 未加 `OmitEmpty()` 导致字段被清空  
-  - 根因：`do.Spec` 所有字段为 `interface{}`；前端仅传 name/cpu/memory/gpu/gpuType 时，NodeSelector/Tolerations/Description 默认为空字符串（非 nil），ORM 会将其写入 DB，清除原有配置  
-  - 修复：`dao.Specs.Ctx(ctx).Where("id", id).Data(in).OmitEmpty().Update()`
-
-- [x] **BUG-3** `backend/internal/controller/spec/spec_v1_handlers.go`：`GET /api/spec` 始终过滤 enabled=1，管理员无法在规格管理页看到禁用规格  
-  - 修复：在 List handler 中读取 JWT 上下文用户，管理员调用 `svcSpec.ListAll(ctx)`，普通用户调用 `svcSpec.List(ctx)`
-
-- [x] **BUG-4** `frontend/src/views/NotebookListView.vue`：创建开发机按钮无禁用状态，有活跃实例时仍可点击  
-  - 修复：添加 `hasActiveNotebook` computed（检测 creating/running/stopping 状态），对创建按钮添加 `:disabled="hasActiveNotebook"` 及 Tooltip 提示
-
-- [x] **BUG-5** `frontend/src/views/NotebookListView.vue`：已停止/异常实例无删除记录按钮，旧记录无法手动清理  
-  - 修复：为 stopped/failed 实例添加"删除记录"按钮（调用 `DELETE /api/notebook/{id}`）；后端 `Delete` 对已停止实例直接物理删除 DB 行
-
-- [x] **BUG-6** `backend/internal/service/notebook/notebook.go`：创建新实例前不清理旧的 stopped/failed 记录，导致每次创建都留下历史条目  
-  - 修复：在 `Create()` 的活跃实例检查通过后，自动删除该用户所有 stopped/failed 记录，保持列表整洁
-
-- [x] **BUG-7** `backend/internal/service/spec/spec.go`：`Create` 未加 `OmitEmpty()`，JSON 列写入空字符串  
-  - 根因：`node_selector` / `tolerations` 定义为 `JSON DEFAULT NULL`；未传时 `do.Spec` 对应字段为 `""`（空字符串），MySQL JSON 列不接受空字符串，报 Error 3140  
-  - 修复：`dao.Specs.Ctx(ctx).Data(in).OmitEmpty().Insert()`（Update 在 BUG-2 时已修复）
-
-- [x] **BUG-8** `backend/internal/service/user/user.go`：`Create` 未在 INSERT 中包含 `uid`，触发 NOT NULL 约束  
-  - 根因：`users.uid INT UNSIGNED NOT NULL` 无 DEFAULT 值；原 Insert 省略 `uid` 字段导致 MySQL Error 1364  
-  - 修复：INSERT 时先存入 `Uid: uint(0)` 占位（满足 NOT NULL），成功后 `UPDATE SET uid = 10000 + id`；同时修复 Update 改用 `g.Map{"uid": uid}` 避免全字段覆盖
-
-- [x] **BUG-9** `backend/internal/service/middleware/middleware.go`：`WriteStatus(200/401/403)` 向响应 Body 写入状态文本前缀  
-  - 根因：GoFrame `r.Response.WriteStatus(code)` 在无第二参数时将 HTTP 状态文本（"OK"/"Unauthorized"/"Forbidden"）写入 Body Buffer，`WriteJson` 追加 JSON 后 Body 变为 `OK{...}`，前端 `JSON.parse` 报 SyntaxError  
-  - 修复：移除所有 `WriteStatus` 调用；Auth/AdminOnly 中间件直接使用 `WriteJson` 输出错误体
-
-- [x] **BUG-10** `backend/internal/service/middleware/middleware.go`：Auth 中间件写响应 + `HandlerResponse` 再次包装，导致 Body 中出现双份 JSON  
-  - 根因：Auth 写完响应后调用 `r.ExitAll()`，但 `HandlerResponse` 的 `r.Middleware.Next()` 返回后仍继续执行并追加第二份 JSON  
-  - 修复：在 `HandlerResponse` 后半段（`Next()` 返回后）加入 `if len(r.Response.Buffer()) > 0 { return }` 检查，若已有内容则跳过包装
-
----
-
 ## QA 测试脚本修复记录（e2e-test.sh）
 
 > 以下记录测试脚本本身的缺陷，与产品功能无关，均已修复。
@@ -268,127 +225,6 @@
 
 ---
 
-## 六、测试用例明细
-
-> 测试文件遵循 `openspec-e2e` 技能规范：每个测试案例一个文件，命名 `TC{NNNN}-{brief-name}.ts`。
-
-### E2E — TC0001 登录验证
-- 文件：`hack/tests/e2e/auth/TC0001-login-verification.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0001a | 登录后跳转到 /notebooks | QA-1 | 输入凭据后 URL 为 /notebooks |
-| TC0001b | 侧边栏显示管理员菜单 | QA-1 | 页面包含"规格管理"菜单项 |
-| TC0001c | 顶部显示用户名 | QA-1 | 页面包含"admin"用户名 |
-
-### E2E — TC0002 规格管理
-- 文件：`hack/tests/e2e/admin/TC0002-spec-management.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0002a | 规格管理页面标题 | QA-1 | 页面含"规格管理"文本 |
-| TC0002b | CPU-小 规格存在 | QA-1 | 列表包含 CPU-小 |
-| TC0002c | CPU-大 规格存在 | QA-1 | 列表包含 CPU-大 |
-| TC0002d | GPU-标准 规格存在 | QA-1 | 列表包含 GPU-标准 |
-| TC0002e | 规格编辑操作可见 | QA-1 | 列表含"编辑"按钮 |
-| TC0002f | 创建规格后出现在列表 | QA-9 | 新规格 Test-CPU-E2E 在列表可见 |
-| TC0002g | 修改规格 CPU 后更新成功 | QA-9 | 修改后 1000m 可见 |
-
-### E2E — TC0003 用户管理
-- 文件：`hack/tests/e2e/admin/TC0003-user-management.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0003a | 用户管理页面标题 | QA-1 | 页面含"用户管理"文本 |
-| TC0003b | admin 用户存在 | QA-1 | 列表包含 admin |
-| TC0003c | admin 用户状态正常 | QA-1 | 状态列显示"正常" |
-| TC0003d | 创建新用户后出现在列表 | QA-9 | testuser01 在用户列表可见 |
-| TC0003e | 禁用用户后状态变更 | QA-9 | testuser01 状态变为禁用 |
-| TC0003f | 新增用户对话框不含 UID 字段 | FB-4 | 对话框中无 UID 输入项 |
-
-### E2E — TC0004 创建开发机
-- 文件：`hack/tests/e2e/notebook/TC0004-create-notebook.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0004a/b | 创建开发机后记录存在且状态正确 | QA-2 | 列表包含用户名，status ∈ {创建中, 运行中} |
-| TC0004c | 有活跃实例时创建按钮禁用 | QA-9 | el-button disabled 属性为 true |
-| TC0004d | API 拒绝重复创建开发机 | QA-9 | 后端返回非 0 code |
-
-### E2E — TC0005 JupyterLab 访问
-- 文件：`hack/tests/e2e/notebook/TC0005-jupyterlab-access.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0005a | Pod 1/1 Running | QA-2 | kubectl 120s 内 Pod Ready |
-| TC0005b | 前端实例状态运行中 | QA-2 | 页面显示"运行中" |
-| TC0005c | JupyterLab UI 加载成功 | QA-2 | 新标签页 jp-* DOM 元素数量 > 5 |
-| TC0005d | 文件浏览器可见 | QA-2 | .jp-FileBrowser / .jp-BreadCrumbs 元素存在 |
-
-### E2E — TC0006 训练代码执行
-- 文件：`hack/tests/e2e/notebook/TC0006-training-execution.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0006a | 训练代码执行完成 | QA-8 | 输出含 TRAINING_TEST_PASSED |
-| TC0006b | 训练代码无运行错误 | QA-8 | 不含 AssertionError/Traceback |
-| TC0006c | 梯度下降收敛 | QA-8 | 输出包含 Trained: 行（断言通过即 w≈2.0） |
-
-### E2E — TC0007 退出登录
-- 文件：`hack/tests/e2e/auth/TC0007-logout.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0007a | 退出登录跳转 /login | QA-1 | URL 变为 /login |
-| TC0007c | 登录表单可见 | QA-1 | 登录按钮文字可见（登 录） |
-| TC0007d | 未登录访问保护路由重定向 | QA-1 | /notebooks → /login |
-| TC0007e | 错误密码登录后留在登录页 | QA-9 | URL 保持 /login，不崩溃 |
-| TC0007f | 错误密码显示错误提示 | QA-9 | Element Plus error toast 出现 |
-
-### E2E — TC0008 不同镜像开发机创建
-- 文件：`hack/tests/e2e/notebook/TC0008-multi-image-notebook.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0008b | 清除记录后创建按钮可用 | QA-9 | 按钮 disabled 为 false |
-| TC0008c/d | PyTorch 镜像创建并显示正确 | QA-9 | 列表镜像列显示 PyTorch 或 pytorch-cuda121，状态为创建中或运行中 |
-
-### E2E — TC0009 多用户共享目录
-- 文件：`hack/tests/e2e/notebook/TC0009-shared-directory.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0009a | admin 在 /share 创建共享文件 | QA-4 | kubectl exec 写入 /share 成功并可读回 |
-| TC0009b | testuser01 可见 /share 共享文件 | QA-4 | testuser01 Pod 中 cat admin 创建的文件内容正确 |
-| TC0009c | testuser01 可在 /share 写入文件 | QA-4 | testuser01 Pod 中写入 /share 成功并可读回 |
-| TC0009d | /share 包含两个用户的文件 | QA-4 | ls 验证 admin 和 testuser01 的文件同时存在 |
-
-### E2E — TC0010 过期/无效 Token 自动跳转登录
-- 文件：`hack/tests/e2e/auth/TC0010-expired-token-redirect.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0010a | 无效 token 访问 /notebooks 后跳转 /login | FB-2 | URL 变为 /login |
-| TC0010b | 跳转后 localStorage token 已清除 | FB-2 | token 为空 |
-| TC0010c | 过期 JWT token 访问后立即跳转 /login | FB-2 | 路由守卫解码 JWT 后跳转 |
-
-### E2E — TC0011 对话框按钮中文化
-- 文件：`hack/tests/e2e/admin/TC0011-dialog-chinese-buttons.ts`
-
-| 编号 | 子断言 | 覆盖 QA | 验证点 |
-|------|--------|---------|--------|
-| TC0011a | 规格管理禁用确认对话框按钮为中文 | FB-3 | 不含 Cancel/OK，含取消 |
-| TC0011b | 规格管理删除确认对话框按钮为中文 | FB-3 | 不含 Cancel/OK，含取消 |
-
-> 最终执行结果（2026-03-05 全量 Bug 修复后）：**PASS=36 FAIL=0** — 全部 36 个测试用例通过 ✅
-> （初版：PASS=24；后续 Bug 修复后新增 TC0007e/TC0007f、TC0002f/TC0002g、TC0003d/TC0003e、TC0004c/TC0004d、TC0008a~TC0008d 共 12 个，合计 36 个）
-> [HF-1] 新增 TC0009a~TC0009d（多用户 /share 共享目录访问），合计 40 个
-> [HF-2] 新增 TC0003f、TC0010a~TC0010c、TC0011a~TC0011b（Feedback FB-2/3/4 修复验证），合计 46 个
-
-
-
----
-
 ## Feedback
 
 - [x] **FB-1**：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
@@ -408,6 +244,43 @@
   - 测试：无需新增 E2E 用例，现有 TC0004/TC0008 开发机创建流程覆盖；此为内部架构改进，`kubectl get pod` 不再出现 `init-home-*`
 
 - [ ] **FB-6**：开发机创建异常时（CreatePod 失败、Pod 进入 Failed 状态、超时），删除 failed 状态记录不会清理 K8S 中已创建的 Pod/Service/Ingress，造成集群脏数据持续占用资源
+- [x] **FB-7**：用户名未校验 Linux 用户名格式（`^[a-z_][a-z0-9_-]{0,31}$`），允许纯数字或含非法字符的用户名，导致 K8S Pod 内 `groupadd` / `useradd` 报错崩溃
+  - 修复：`backend/internal/service/user/user.go` 中 `Create()` 冒头增加正则校验，不符合格式返回错误
+  - 修复：`frontend/src/views/UserManageView.vue` 用户名 rules 增加 `pattern` 正则验证，前端即时拦截
+  - 测试：TC0003g（前端表单拦截非法用户名）、TC0003h（后端 API 拒绝非法用户名并接受合法用户名）
+- [x] **FB-8**：Pod Phase=Running 但容器 Ready=0/1 时，后端将实例状态提前标记为 running，前端显示"运行中"与实际可用性不符
+  - 修复：`backend/internal/service/k8s/pod.go` `GetPodStatus` 增加容器 Ready 检查，Phase=Running 且 ContainerStatuses 全部 Ready 才返回 `"Running"`，否则返回 `"Pending"`
+- [x] **FB-9**：主容器 CHOWN_HOME 在 NFS 挂载上递归 chown 导致启动缓慢（0/1 状态持续时间过长），应由 initContainer 负责 chown 并移除 CHOWN_HOME 相关环境变量
+  - 修复：`pod.go` 移除主容器 `NB_USER`、`CHOWN_HOME`、`CHOWN_HOME_OPTS` 环境变量；ReadinessProbe `InitialDelaySeconds` 10→30 避免过早 probe 失败
+- [x] **FB-10**：主容器挂载 subPath 错误（`data/home` → `/data/home`），JupyterLab 将文件写入容器本地 `/home/jovyan` 而非 NFS，重启后文件丢失；应将 `data/home/{username}` 直接挂载到 `/home/jovyan`
+  - 修复：`pod.go` 主容器 VolumeMounts 改为 `MountPath: "/home/jovyan"`，`SubPath: fmt.Sprintf("%s/%s", consts.NFSHomeSubPath, opts.Username)`
+  - 测试：TC0013（重启后 `/home/jovyan` 文件持久化验证）
+- [x] **FB-11**：所有页面 HTML title 均显示 "frontend"，应根据路由动态设置中文标题
+  - 修复：`frontend/src/router/index.ts` 各路由添加 `meta.title`，`beforeEach` 中设置 `document.title`；`frontend/index.html` 默认 title 改为"AI 训练平台"
+  - 测试：TC0001d（登录页 title）、TC0001e（开发机页 title）
+- [x] **FB-12**：Pod 探针 PeriodSeconds 过长（就绪探针 10s、存活探针 20s），导致 0/1 状态检测延迟，应调整为 5 秒一次
+  - 修复：`backend/internal/service/k8s/pod.go` LivenessProbe PeriodSeconds 20→5，ReadinessProbe PeriodSeconds 10→5
+- [x] **FB-13**：开发机状态刷新仅在 creating/stopping 状态下轮询，running 状态停止轮询；应扩展为 running 状态也持续刷新（5 秒一次）
+  - 修复：`frontend/src/views/NotebookListView.vue` `needsPolling()` 增加 `'running'` 判断
+- [x] **FB-14**：用户管理缺少编辑功能，无法修改用户角色（isAdmin）和密码
+  - 修复：后端新增 `PUT /user/{id}` 接口（UpdateReq/UpdateRes）；前端用户管理页增加编辑对话框，支持修改角色和密码
+  - 测试：TC0014（TC0014a~TC0014e）
+- [x] **FB-15**：用户管理缺少删除功能；删除应实现为软删除（deleted_at 字段），删除后列表不可见
+  - 修复：数据库 users 表新增 `deleted_at DATETIME DEFAULT NULL`；后端新增 `DELETE /user/{id}` 软删除接口；List/GetById/Login 均过滤 deleted_at IS NULL；前端增加删除按钮
+  - 测试：TC0015（TC0015a~TC0015d）
+- [x] **FB-16**：用户列表创建时间列无数据显示（UserItem 响应结构缺少 createdAt 字段）
+  - 修复：`api/user/v1/user.go` UserItem 增加 `CreatedAt string`；controller List 映射 `u.CreatedAt.Format("Y-m-d H:i:s")`
+  - 测试：TC0003i
+- [x] **FB-17**：`entity.User` / `do.User` 缺少 `deleted_at` 字段，GoFrame ORM 软删除特性未激活 —— 所有 `AND deleted_at IS NULL` 条件散落在 service 与 auth 中手动维护（共 5 处），`user.Delete()` 也需手动执行 UPDATE 而非 ORM 自动处理
+  - 修复：`entity/users.go` + `do/users.go` 添加 `DeletedAt` 字段；删除 `user.go` / `auth.go` 中全部手动 `deleted_at IS NULL` 条件；`user.Delete()` 改为 ORM 标准 `Delete()`
+- [x] **FB-18**：`user.Create()` 先 INSERT 再 UPDATE uid 两步操作未包裹事务，若 UPDATE 失败将残留 `uid=0` 的僵尸记录
+  - 修复：`user.Create()` 整体包裹 `dao.Users.Transaction()`，INSERT + UPDATE uid 在同一事务中原子执行
+- [x] **FB-19**：`spec.Delete()` 执行物理硬删除且无引用检查，若规格仍被实例引用则 `spec_id` 成悬空引用
+  - 修复：`spec.Delete()` 先查询 `dao.Instances` 是否存在对该 `spec_id` 的引用，存在则返回业务错误拒绝删除
+- [x] **FB-20**：`spec_v1_handlers.go` 内联提取当前用户的逻辑重复，应提取为 `model.GetContextUser(ctx)` 辅助函数
+  - 修复：`model/context.go` 新增 `GetContextUser(ctx)` 函数；`spec_v1_handlers.go` 和 `notebook_v1_handlers.go` 均改用该函数，移除各自的内联提取逻辑
+- [x] **FB-21**：`notebook.Create()` 后台 goroutine 使用 `context.Background()` 丢失链路追踪信息，应改用 `context.WithoutCancel(ctx)`
+  - 修复：`notebook.go` goroutine 内 `bgCtx := context.Background()` 改为 `bgCtx := context.WithoutCancel(ctx)`
 
 ---
 

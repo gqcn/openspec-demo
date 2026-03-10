@@ -52,7 +52,15 @@ func Update(ctx context.Context, id uint, in *do.Spec) error {
 }
 
 // Delete removes a spec by ID.
+// It refuses to delete a spec that is still referenced by any instance to prevent dangling spec_id references.
 func Delete(ctx context.Context, id uint) error {
-	_, err := dao.Specs.Ctx(ctx).Where("id", id).Delete()
+	count, err := dao.Instances.Ctx(ctx).Where("spec_id", id).Count()
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "该规格套餐下存在开发机实例，无法删除")
+	}
+	_, err = dao.Specs.Ctx(ctx).Where("id", id).Delete()
 	return err
 }

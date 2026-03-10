@@ -93,9 +93,10 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 			Tolerations:     tolerations,
 			InitContainers: []corev1.Container{
 				{
-					Name:    "init-home",
-					Image:   "busybox:1.36",
-					Command: []string{"sh", "-c", initCmd},
+					Name:            "init-home",
+					Image:           "busybox:1.36",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command:         []string{"sh", "-c", initCmd},
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: ptrInt64(0),
 					},
@@ -115,8 +116,9 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 			},
 			Containers: []corev1.Container{
 				{
-					Name:  "jupyterlab",
-					Image: opts.Image,
+					Name:            "jupyterlab",
+					Image:           opts.Image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					// Use start-notebook.sh without inline args; pass config via env vars
 					// (compatible with jupyter/base-notebook 4.x / jupyter_server 2.x)
 					SecurityContext: &corev1.SecurityContext{
@@ -125,13 +127,13 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 					Env: []corev1.EnvVar{
 						{Name: "NB_UID", Value: fmt.Sprintf("%d", opts.Uid)},
 						{Name: "NB_GID", Value: fmt.Sprintf("%d", opts.Uid)},
-						{Name: "NB_USER", Value: opts.Username},
+						// NB_USER is intentionally omitted: the initContainer already handles
+						// ownership of /home/jovyan via chown, and renaming the jovyan user
+						// inside the container is unnecessary and can fail for some usernames.
+						// CHOWN_HOME is omitted for the same reason: initContainer handles it,
+						// and recursive NFS chown significantly delays container startup.
 						// Disable token auth: routing token in URL path is the security boundary.
-						// Pass ServerApp.base_url and disable token/password via NOTEBOOK_ARGS.
-						// allow_origin='*' permits cross-origin API requests from the Vite dev proxy (localhost:3002).
 						{Name: "NOTEBOOK_ARGS", Value: fmt.Sprintf("--ServerApp.base_url=%s --ServerApp.token= --ServerApp.password='' --ServerApp.allow_origin='*'", baseURL)},
-						{Name: "CHOWN_HOME", Value: "yes"},
-						{Name: "CHOWN_HOME_OPTS", Value: "-R"},
 					},
 					Ports: []corev1.ContainerPort{
 						{ContainerPort: consts.JupyterPort, Protocol: corev1.ProtocolTCP},
@@ -140,8 +142,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "jupyter-shared",
-							MountPath: "/data/home",
-							SubPath:   consts.NFSHomeSubPath,
+							MountPath: "/home/jovyan",
+							SubPath:   fmt.Sprintf("%s/%s", consts.NFSHomeSubPath, opts.Username),
 						},
 						{
 							Name:      "jupyter-shared",
@@ -156,9 +158,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 								Port: probePortVal,
 							},
 						},
-						InitialDelaySeconds: 30,
-						PeriodSeconds:       20,
-						FailureThreshold:    5,
+						PeriodSeconds:    5,
+						FailureThreshold: 5,
 					},
 					ReadinessProbe: &corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -167,9 +168,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 								Port: probePortVal,
 							},
 						},
-						InitialDelaySeconds: 10,
-						PeriodSeconds:       10,
-						FailureThreshold:    3,
+						PeriodSeconds:    5,
+						FailureThreshold: 3,
 					},
 				},
 			},
@@ -204,6 +204,8 @@ func DeletePod(ctx context.Context, username string) error {
 }
 
 // GetPodStatus returns the current phase and pod IP.
+// The phase is reported as "Running" only when all containers have passed their
+// readiness probes (i.e., the pod is fully available, not just in Running phase).
 func GetPodStatus(ctx context.Context, username string) (phase string, podIP string, nodeName string, err error) {
 	ns := Namespace(ctx)
 	podName := consts.PodNamePrefix + username
@@ -211,7 +213,21 @@ func GetPodStatus(ctx context.Context, username string) (phase string, podIP str
 	if err != nil {
 		return "", "", "", err
 	}
-	return string(pod.Status.Phase), pod.Status.PodIP, pod.Spec.NodeName, nil
+	p := string(pod.Status.Phase)
+	// A pod may be in Running phase while containers are still starting (0/1 Ready).
+	// Only propagate Running once every container reports Ready=true.
+	if p == "Running" {
+		statuses := pod.Status.ContainerStatuses
+		if len(statuses) == 0 {
+			return "Pending", pod.Status.PodIP, pod.Spec.NodeName, nil
+		}
+		for _, cs := range statuses {
+			if !cs.Ready {
+				return "Pending", pod.Status.PodIP, pod.Spec.NodeName, nil
+			}
+		}
+	}
+	return p, pod.Status.PodIP, pod.Spec.NodeName, nil
 }
 
 // probePort converts an int32 to the IntOrString type used by K8S probes.

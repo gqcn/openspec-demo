@@ -66,6 +66,26 @@ The system SHALL provide an admin endpoint to create new users. The user record 
 - **WHEN** admin creates a user with a username that already exists
 - **THEN** the system returns an error due to the unique constraint on `username`
 
+### Requirement: Username format validation
+Because usernames are used as Linux usernames inside Kubernetes Pod containers (via `NB_USER` environment variable, which drives `useradd`/`groupadd` inside JupyterLab startup scripts), the system SHALL enforce that usernames match Linux username naming rules. The system SHALL reject any username that does not match the pattern `^[a-z_][a-z0-9_-]{0,31}$`. Both the backend API and the frontend form SHALL enforce this rule.
+
+The pattern enforces:
+- Starts with a lowercase letter or underscore
+- Contains only lowercase letters, digits, underscores, or hyphens
+- Maximum 32 characters total
+
+#### Scenario: Invalid username rejected at API level
+- **WHEN** admin submits `POST /api/user` with a username that does not match `^[a-z_][a-z0-9_-]{0,31}$` (e.g., `"123"`, `"User@Name"`, `"a b"`)
+- **THEN** the system returns a non-zero error code with a descriptive message; no user record is created
+
+#### Scenario: Invalid username rejected at frontend level
+- **WHEN** admin types an invalid username in the create-user dialog and submits
+- **THEN** the frontend form displays a validation error message and does not call the API
+
+#### Scenario: Valid username accepted
+- **WHEN** admin submits a username matching `^[a-z_][a-z0-9_-]{0,31}$` (e.g., `"zhangsan"`, `"user_01"`, `"_admin"`)
+- **THEN** the user is created successfully
+
 ### Requirement: Admin can list and manage users
 The system SHALL provide `GET /api/user` to list all users and allow admin to enable/disable users by updating their status field.
 
@@ -88,6 +108,24 @@ The frontend Vue Router SHALL redirect unauthenticated users to `/login` when th
 - **WHEN** a user with a valid JWT navigates to `/notebooks`
 - **THEN** the page loads normally
 
+### Requirement: Dynamic page titles
+The frontend SHALL set the browser's `document.title` dynamically based on the current route, so users can identify the page from the browser tab or window title. The format SHALL be `{页面名称} — AI 训练平台`. When no page-specific title is defined, the fallback is `AI 训练平台`.
+
+| 路由 | document.title |
+|------|---------------|
+| `/login` | 登录 — AI 训练平台 |
+| `/notebooks` | 我的开发机 — AI 训练平台 |
+| `/specs` | 规格管理 — AI 训练平台 |
+| `/users` | 用户管理 — AI 训练平台 |
+
+#### Scenario: Login page title
+- **WHEN** user navigates to `/login`
+- **THEN** the browser page title is "登录 — AI 训练平台"
+
+#### Scenario: Notebook page title
+- **WHEN** authenticated user navigates to `/notebooks`
+- **THEN** the browser page title is "我的开发机 — AI 训练平台"
+
 ### Requirement: Login page UI
 The system SHALL provide a login page with username and password input fields and a submit button. The page SHALL display error messages from the backend when login fails.
 
@@ -98,3 +136,25 @@ The system SHALL provide a login page with username and password input fields an
 #### Scenario: Error message displayed on login failure
 - **WHEN** user submits wrong credentials
 - **THEN** an error message is shown on the login page and the page does not crash
+
+### Requirement: Admin can edit users
+The admin SHALL be able to modify an existing user's role (isAdmin) and password via `PUT /api/user/{id}`. At least one of the two fields MUST be provided. If password is provided, it SHALL be bcrypt-hashed before storage. The username and UID SHALL NOT be modifiable after creation.
+
+#### Scenario: Admin changes user role to admin
+- **WHEN** admin submits `PUT /api/user/{id}` with `{"isAdmin": 1}`
+- **THEN** the user record is updated and subsequent logins reflect the new role
+
+#### Scenario: Admin changes user password
+- **WHEN** admin submits `PUT /api/user/{id}` with `{"password": "<newpass>"}`
+- **THEN** the user's password hash is updated and the user can log in with the new password
+
+### Requirement: Admin can soft-delete users
+The admin SHALL be able to delete a user via `DELETE /api/user/{id}`. Deletion is soft — the record is retained in the database with a `deleted_at` timestamp set to the current time. Soft-deleted users SHALL NOT appear in `GET /api/user` list responses and SHALL NOT be able to log in. The admin user (id=1 or `is_admin=1`) SHALL be protected from deletion to prevent lockout.
+
+#### Scenario: Admin deletes a user
+- **WHEN** admin performs `DELETE /api/user/{id}` on a regular user
+- **THEN** `deleted_at` is set on the record; the user no longer appears in the list
+
+#### Scenario: Deleted user cannot log in
+- **WHEN** a soft-deleted user attempts to log in
+- **THEN** the system returns an error (user not found or account disabled)

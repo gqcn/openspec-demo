@@ -49,6 +49,43 @@ export class UserPage {
     await this.page.waitForTimeout(1_500)
   }
 
+  /** Open edit dialog for a user by username and save changes. */
+  async editUser(username: string, opts: { password?: string; isAdmin?: number }) {
+    const rows = await this.page.locator('tr').all()
+    for (const row of rows) {
+      const text = await row.innerText().catch(() => '')
+      if (text.includes(username)) {
+        await row.getByRole('button', { name: '\u7f16\u8f91' }).click()
+        await this.page.waitForSelector('.el-dialog__body', { timeout: 4_000 })
+        if (opts.password !== undefined) {
+          await this.page.locator('.el-dialog [type="password"]').fill(opts.password)
+        }
+        if (opts.isAdmin !== undefined) {
+          const radioLabel = opts.isAdmin === 1 ? '\u7ba1\u7406\u5458' : '\u666e\u901a\u7528\u6237'
+          await this.page.locator('.el-dialog').getByText(radioLabel).click()
+        }
+        await this.page.locator('.el-dialog').getByRole('button', { name: '\u4fdd\u5b58' }).click()
+        await this.page.waitForTimeout(1_500)
+        break
+      }
+    }
+  }
+
+  /** Delete a user by username (soft delete). */
+  async deleteUser(username: string) {
+    const rows = await this.page.locator('tr').all()
+    for (const row of rows) {
+      const text = await row.innerText().catch(() => '')
+      if (text.includes(username)) {
+        await row.getByRole('button', { name: '\u5220\u9664' }).click()
+        await this.page.waitForSelector('.el-message-box', { timeout: 3_000 })
+        await this.page.locator('.el-message-box__btns').getByRole('button', { name: '\u5220\u9664' }).click()
+        await this.page.waitForTimeout(1_500)
+        break
+      }
+    }
+  }
+
   /** Re-enable a user via API. */
   async enableUserViaApi(username: string): Promise<string> {
     return await this.page.evaluate(async (name) => {

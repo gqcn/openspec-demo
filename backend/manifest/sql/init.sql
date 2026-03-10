@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `status`        TINYINT UNSIGNED NOT NULL DEFAULT 1              COMMENT '账号状态：1=正常 0=禁用',
   `created_at`    DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at`    DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at`    DATETIME         DEFAULT NULL                       COMMENT '软删除时间，非 NULL 时账号不可见且不可登录',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_username` (`username`),
   UNIQUE KEY `uk_uid`      (`uid`)
