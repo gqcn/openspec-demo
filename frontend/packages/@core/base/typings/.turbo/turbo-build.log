@@ -1,0 +1,12 @@
+
+> @vben-core/typings@5.5.9 build /Users/john/Workspace/github/gqcn/openspec-demo/frontend/packages/@core/base/typings
+> pnpm unbuild
+
+ℹ Building typings
+ℹ Cleaning dist directory: ./dist
+Generated an empty chunk: "index".
+✔ Build succeeded for typings
+  dist/index.mjs (total size: 1 B, chunk size: 1 B)
+
+Σ Total dist size (byte size): 18.4 kB
+

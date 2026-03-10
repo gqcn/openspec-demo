@@ -1,0 +1,46 @@
+
+> @vben-core/layout-ui@5.5.9 build /Users/john/Workspace/github/gqcn/openspec-demo/frontend/packages/@core/ui-kit/layout-ui
+> pnpm unbuild
+
+ℹ Building layout-ui
+ℹ Cleaning dist directory: ./dist
+[mkdist] vue-sfc-transformer is not installed. mkdist will not transform typescript syntax in Vue SFCs.
+✔ Build succeeded for layout-ui
+  dist (total size: 52.7 kB)
+  └─ dist/components/layout-content.d.vue.ts (1.06 kB)
+  └─ dist/vben-layout.vue.d.ts (3.64 kB)
+  └─ dist/vben-layout.vue (15.7 kB)
+  └─ dist/components/layout-content.vue (1.48 kB)
+  └─ dist/vben-layout.d.vue.ts (3.64 kB)
+  └─ dist/components/layout-footer.d.vue.ts (871 B)
+  └─ dist/components/widgets/sidebar-collapse-button.d.vue.ts (595 B)
+  └─ dist/components/layout-footer.vue.d.ts (871 B)
+  └─ dist/components/layout-sidebar.d.vue.ts (3.51 kB)
+  └─ dist/components/layout-header.vue.d.ts (1.23 kB)
+  └─ dist/components/layout-sidebar.vue.d.ts (3.51 kB)
+  └─ dist/components/layout-tabbar.vue.d.ts (699 B)
+  └─ dist/components/layout-tabbar.vue (515 B)
+  └─ dist/components/layout-sidebar.vue (7.37 kB)
+  └─ dist/components/layout-tabbar.d.vue.ts (699 B)
+  └─ dist/components/layout-footer.vue (803 B)
+  └─ dist/components/widgets/sidebar-fixed-button.vue.d.ts (607 B)
+  └─ dist/components/widgets/sidebar-fixed-button.d.vue.ts (607 B)
+  └─ dist/components/widgets/sidebar-fixed-button.vue (568 B)
+  └─ dist/components/widgets/sidebar-collapse-button.vue (555 B)
+  └─ dist/components/layout-header.vue (1.36 kB)
+  └─ dist/components/widgets/sidebar-collapse-button.vue.d.ts (595 B)
+  └─ dist/components/layout-content.vue.d.ts (1.06 kB)
+  └─ dist/components/layout-header.d.vue.ts (1.23 kB)
+  dist (total size: 5.8 kB)
+  └─ dist/vben-layout.mjs
+  └─ dist/hooks/use-layout.d.ts (508 B)
+  └─ dist/index.d.ts (100 B)
+  └─ dist/vben-layout.d.ts (3.4 kB)
+  └─ dist/index.mjs (64 B)
+  └─ dist/components/index.mjs (319 B)
+  └─ dist/hooks/use-layout.mjs (773 B)
+  └─ dist/components/widgets/index.mjs (158 B)
+  └─ dist/components/index.d.ts (319 B)
+  └─ dist/components/widgets/index.d.ts (158 B)
+Σ Total dist size (byte size): 58.5 kB
+

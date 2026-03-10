@@ -1,0 +1,51 @@
+
+> @vben-core/popup-ui@5.2.1 build /Users/john/Workspace/github/gqcn/openspec-demo/frontend/packages/@core/ui-kit/popup-ui
+> pnpm unbuild
+
+ℹ Building popup-ui
+ℹ Cleaning dist directory: ./dist
+[mkdist] vue-sfc-transformer is not installed. mkdist will not transform typescript syntax in Vue SFCs.
+✔ Build succeeded for popup-ui
+  dist (total size: 32.2 kB)
+  └─ dist/modal/modal.vue.d.ts (1.51 kB)
+  └─ dist/alert/alert.vue.d.ts (1.06 kB)
+  └─ dist/drawer/drawer.vue.d.ts (1.76 kB)
+  └─ dist/alert/alert.vue (5.51 kB)
+  └─ dist/modal/modal.d.vue.ts (1.51 kB)
+  └─ dist/drawer/drawer.vue (8.59 kB)
+  └─ dist/drawer/drawer.d.vue.ts (1.76 kB)
+  └─ dist/modal/modal.vue (9.49 kB)
+  └─ dist/alert/alert.d.vue.ts (1.06 kB)
+  dist (total size: 45.3 kB)
+  └─ dist/drawer/drawer.mjs
+  └─ dist/modal/modal.mjs
+  └─ dist/modal/__tests__/modal-api.test.d.ts (11 B)
+  └─ dist/index.mjs (106 B)
+  └─ dist/index.d.ts (76 B)
+  └─ dist/alert/index.d.ts (292 B)
+  └─ dist/drawer/drawer-api.d.ts (1.7 kB)
+  └─ dist/alert/index.mjs (222 B)
+  └─ dist/drawer/drawer-api.mjs (3.65 kB)
+  └─ dist/alert/alert.d.ts (2.67 kB)
+  └─ dist/drawer/index.d.ts (154 B)
+  └─ dist/alert/AlertBuilder.mjs (4.61 kB)
+  └─ dist/alert/AlertBuilder.d.ts (770 B)
+  └─ dist/drawer/index.mjs (127 B)
+  └─ dist/drawer/use-drawer.d.ts (419 B)
+  └─ dist/drawer/use-drawer.mjs (3.06 kB)
+  └─ dist/modal/modal-api.mjs (3.81 kB)
+  └─ dist/modal/index.d.ts (148 B)
+  └─ dist/modal/modal-api.d.ts (1.69 kB)
+  └─ dist/modal/index.mjs (122 B)
+  └─ dist/modal/modal.d.ts (3.76 kB)
+  └─ dist/modal/use-modal-draggable.d.ts (565 B)
+  └─ dist/modal/use-modal.d.ts (405 B)
+  └─ dist/modal/use-modal.mjs (3.29 kB)
+  └─ dist/modal/use-modal-draggable.mjs (3.38 kB)
+  └─ dist/modal/__tests__/modal-api.test.mjs (3.19 kB)
+  └─ dist/drawer/__tests__/drawer-api.test.d.ts (11 B)
+  └─ dist/drawer/drawer.d.ts (3.54 kB)
+  └─ dist/alert/alert.mjs (341 B)
+  └─ dist/drawer/__tests__/drawer-api.test.mjs (3.22 kB)
+Σ Total dist size (byte size): 77.6 kB
+

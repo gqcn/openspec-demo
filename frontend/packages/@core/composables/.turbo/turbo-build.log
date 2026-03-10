@@ -1,0 +1,11 @@
+
+> @vben-core/composables@5.5.9 build /Users/john/Workspace/github/gqcn/openspec-demo/frontend/packages/@core/composables
+> pnpm unbuild
+
+ℹ Building composables
+ℹ Cleaning dist directory: ./dist
+✔ Build succeeded for composables
+  dist/index.mjs (total size: 8.7 kB, chunk size: 8.7 kB, exports: SCROLL_FIXED_CLASS, useEmitAsProps, useForwardExpose, useForwardPriorityValues, useForwardProps, useForwardPropsEmits, useIsMobile, useLayoutContentStyle, useLayoutFooterStyle, useLayoutHeaderStyle, useNamespace, usePriorityValue, usePriorityValues, useScrollLock, useSimpleLocale, useSortable)
+
+Σ Total dist size (byte size): 15.6 kB
+
