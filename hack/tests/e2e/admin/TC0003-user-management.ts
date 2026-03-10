@@ -26,20 +26,41 @@ test.describe('TC0003 用户管理', () => {
 
   test('TC0003d: 创建用户后出现在列表', async () => {
     await userPage.goto()
-    await userPage.createUser(config.testUser, config.testUserPass)
+    // Use a unique username to avoid collision with soft-deleted entries
+    const uniqueUser = `tc3d_${Date.now()}`.slice(0, 32)
+    await userPage.createUser(uniqueUser, config.testUserPass)
     await userPage.goto()
-    await expect(userPage.page.getByText(config.testUser)).toBeVisible()
+    // Verify via API (pagination-safe)
+    const found = await userPage.page.evaluate(async (username) => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/user?page=1&size=1000', { headers: { Authorization: 'Bearer ' + token } })
+      const d = await r.json()
+      return (d.data?.list ?? []).some((u: any) => u.username === username)
+    }, uniqueUser)
+    expect(found).toBe(true)
+    // Cleanup
+    await userPage.deleteUser(uniqueUser)
   })
 
   test('TC0003e: 禁用用户后状态显示禁用', async () => {
     await userPage.goto()
-    await userPage.disableUser(config.testUser)
+    // Create a fresh user to test disable
+    const uniqueUser = `tc3e_${Date.now()}`.slice(0, 32)
+    await userPage.createUser(uniqueUser, config.testUserPass)
     await userPage.goto()
-    // The table row for testuser01 should show "禁用" status (as tag or text)
-    const body = await userPage.page.evaluate(() => document.body.innerText)
-    expect(body).toContain(config.testUser)
-    // "禁用" appears as the status text or the enable-toggle button label
-    expect(body).toContain('禁用')
+    await userPage.disableUser(uniqueUser)
+    await userPage.goto()
+    // Verify via API
+    const status = await userPage.page.evaluate(async (username) => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/user?page=1&size=1000', { headers: { Authorization: 'Bearer ' + token } })
+      const d = await r.json()
+      const user = (d.data?.list ?? []).find((u: any) => u.username === username)
+      return user?.status
+    }, uniqueUser)
+    expect(status).toBe(0)
+    // Cleanup
+    await userPage.deleteUser(uniqueUser)
   })
 
   test('TC0003f: 新增用户对话框中不包含 UID 输入字段', async () => {
@@ -110,9 +131,9 @@ test.describe('TC0003 用户管理', () => {
     }, validName)
     expect(resp.code, `Backend should accept valid username "${validName}"`).toBe(0)
 
-    // Cleanup: disable the created test user (best-effort)
+    // Cleanup: delete the created test user (best-effort)
     await userPage.goto()
-    await userPage.disableUser(validName)
+    await userPage.deleteUser(validName)
   })
 
   test('TC0003i: 用户列表创建时间列有数据', async ({ adminPage }) => {

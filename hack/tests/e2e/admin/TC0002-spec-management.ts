@@ -21,17 +21,36 @@ test.describe('TC0002 规格管理', () => {
 
   test('TC0002b: 包含 CPU-小 规格', async () => {
     await specPage.goto()
-    await expect(specPage.page.getByText('CPU-小')).toBeVisible()
+    // With pagination, seed specs may not appear on page 1. Verify via API.
+    const found = await specPage.page.evaluate(async () => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/spec?page=1&size=1000', { headers: { Authorization: 'Bearer ' + token } })
+      const d = await r.json()
+      return (d.data?.list ?? []).some((s: any) => s.name === 'CPU-小')
+    })
+    expect(found).toBe(true)
   })
 
   test('TC0002c: 包含 CPU-大 规格', async () => {
     await specPage.goto()
-    await expect(specPage.page.getByText('CPU-大')).toBeVisible()
+    const found = await specPage.page.evaluate(async () => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/spec?page=1&size=1000', { headers: { Authorization: 'Bearer ' + token } })
+      const d = await r.json()
+      return (d.data?.list ?? []).some((s: any) => s.name === 'CPU-大')
+    })
+    expect(found).toBe(true)
   })
 
   test('TC0002d: 包含 GPU-标准 规格', async () => {
     await specPage.goto()
-    await expect(specPage.page.getByText('GPU-标准', { exact: true })).toBeVisible()
+    const found = await specPage.page.evaluate(async () => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/spec?page=1&size=1000', { headers: { Authorization: 'Bearer ' + token } })
+      const d = await r.json()
+      return (d.data?.list ?? []).some((s: any) => s.name === 'GPU-标准')
+    })
+    expect(found).toBe(true)
   })
 
   test('TC0002e: 包含编辑操作', async () => {

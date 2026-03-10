@@ -11,21 +11,49 @@ import (
 	"github.com/gqcn/platform/backend/internal/model/entity"
 )
 
-// List returns all enabled specs ordered by sort_order.
-func List(ctx context.Context) (list []*entity.Spec, err error) {
-	err = dao.Specs.Ctx(ctx).Where("enabled", 1).OrderAsc("sort_order").Scan(&list)
+// Service provides spec management business logic.
+type Service struct{}
+
+// New creates and returns a new Service instance.
+func New() *Service {
+	return &Service{}
+}
+
+// List returns paginated enabled specs ordered by sort_order.
+func (s *Service) List(ctx context.Context, page, size int) (list []*entity.Spec, total int, err error) {
+	cols := dao.Specs.Columns()
+	m := dao.Specs.Ctx(ctx).Where(cols.Enabled, 1)
+	total, err = m.Count()
+	if err != nil {
+		return
+	}
+	err = m.Page(page, size).OrderAsc(cols.SortOrder).Scan(&list)
 	return
 }
 
-// ListAll returns all specs including disabled ones (admin use).
-func ListAll(ctx context.Context) (list []*entity.Spec, err error) {
-	err = dao.Specs.Ctx(ctx).OrderAsc("sort_order").Scan(&list)
+// ListAll returns paginated specs including disabled ones (admin use).
+func (s *Service) ListAll(ctx context.Context, page, size int) (list []*entity.Spec, total int, err error) {
+	cols := dao.Specs.Columns()
+	m := dao.Specs.Ctx(ctx)
+	total, err = m.Count()
+	if err != nil {
+		return
+	}
+	err = m.Page(page, size).OrderAsc(cols.SortOrder).Scan(&list)
+	return
+}
+
+// ListAllUnpaged returns all specs without pagination (for internal lookups like spec name maps).
+func (s *Service) ListAllUnpaged(ctx context.Context) (list []*entity.Spec, err error) {
+	cols := dao.Specs.Columns()
+	err = dao.Specs.Ctx(ctx).OrderAsc(cols.SortOrder).Scan(&list)
 	return
 }
 
 // GetById returns a spec by ID.
-func GetById(ctx context.Context, id uint) (spec *entity.Spec, err error) {
-	err = dao.Specs.Ctx(ctx).Where("id", id).Scan(&spec)
+func (s *Service) GetById(ctx context.Context, id uint) (spec *entity.Spec, err error) {
+	cols := dao.Specs.Columns()
+	err = dao.Specs.Ctx(ctx).Where(cols.Id, id).Scan(&spec)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +64,7 @@ func GetById(ctx context.Context, id uint) (spec *entity.Spec, err error) {
 }
 
 // Create inserts a new spec record.
-func Create(ctx context.Context, in *do.Spec) (id uint, err error) {
+func (s *Service) Create(ctx context.Context, in *do.Spec) (id uint, err error) {
 	res, err := dao.Specs.Ctx(ctx).Data(in).OmitEmpty().Insert()
 	if err != nil {
 		return 0, err
@@ -46,21 +74,24 @@ func Create(ctx context.Context, in *do.Spec) (id uint, err error) {
 }
 
 // Update modifies a spec record.
-func Update(ctx context.Context, id uint, in *do.Spec) error {
-	_, err := dao.Specs.Ctx(ctx).Where("id", id).Data(in).OmitEmpty().Update()
+func (s *Service) Update(ctx context.Context, id uint, in *do.Spec) error {
+	cols := dao.Specs.Columns()
+	_, err := dao.Specs.Ctx(ctx).Where(cols.Id, id).Data(in).OmitEmpty().Update()
 	return err
 }
 
 // Delete removes a spec by ID.
 // It refuses to delete a spec that is still referenced by any instance to prevent dangling spec_id references.
-func Delete(ctx context.Context, id uint) error {
-	count, err := dao.Instances.Ctx(ctx).Where("spec_id", id).Count()
+func (s *Service) Delete(ctx context.Context, id uint) error {
+	instCols := dao.Instances.Columns()
+	count, err := dao.Instances.Ctx(ctx).Where(instCols.SpecId, id).Count()
 	if err != nil {
 		return err
 	}
 	if count > 0 {
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "该规格套餐下存在开发机实例，无法删除")
 	}
-	_, err = dao.Specs.Ctx(ctx).Where("id", id).Delete()
+	cols := dao.Specs.Columns()
+	_, err = dao.Specs.Ctx(ctx).Where(cols.Id, id).Delete()
 	return err
 }

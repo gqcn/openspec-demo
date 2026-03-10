@@ -19,12 +19,20 @@ import (
 	svcK8s "github.com/gqcn/platform/backend/internal/service/k8s"
 )
 
+// Service provides scheduled task management.
+type Service struct{}
+
+// New creates and returns a new Service instance.
+func New() *Service {
+	return &Service{}
+}
+
 // StartIdleChecker registers the cron job that checks for idle JupyterLab instances.
-func StartIdleChecker(ctx context.Context) {
+func (s *Service) StartIdleChecker(ctx context.Context) {
 	interval := g.Cfg().MustGet(ctx, "notebook.checkIntervalMin", 60).Int()
 	spec := fmt.Sprintf("@every %dm", interval)
 	_, err := gcron.Add(ctx, spec, func(ctx context.Context) {
-		checkIdleInstances(ctx)
+		s.checkIdleInstances(ctx)
 	}, "idle-checker")
 	if err != nil {
 		g.Log().Errorf(ctx, "cron: failed to register idle-checker: %v", err)
@@ -33,10 +41,11 @@ func StartIdleChecker(ctx context.Context) {
 	g.Log().Infof(ctx, "cron: idle-checker registered, interval=%dm", interval)
 }
 
-func checkIdleInstances(ctx context.Context) {
+func (s *Service) checkIdleInstances(ctx context.Context) {
 	g.Log().Info(ctx, "cron: idle-checker started")
+	cols := dao.Instances.Columns()
 	var instances []*entity.Instance
-	err := dao.Instances.Ctx(ctx).Where("status", consts.StatusRunning).Scan(&instances)
+	err := dao.Instances.Ctx(ctx).Where(cols.Status, consts.StatusRunning).Scan(&instances)
 	if err != nil {
 		g.Log().Errorf(ctx, "cron: query running instances error: %v", err)
 		return
@@ -45,7 +54,7 @@ func checkIdleInstances(ctx context.Context) {
 	idleTimeout := g.Cfg().MustGet(ctx, "notebook.idleTimeoutHours", 48).Int()
 
 	for _, ins := range instances {
-		processInstance(ctx, ins, idleTimeout)
+		s.processInstance(ctx, ins, idleTimeout)
 	}
 	g.Log().Info(ctx, "cron: idle-checker finished")
 }
@@ -57,7 +66,7 @@ type kernelInfo struct {
 	LastActivity   string `json:"last_activity"`
 }
 
-func processInstance(ctx context.Context, ins *entity.Instance, idleTimeoutHours int) {
+func (s *Service) processInstance(ctx context.Context, ins *entity.Instance, idleTimeoutHours int) {
 	if ins.PodIp == "" {
 		return
 	}
@@ -67,19 +76,19 @@ func processInstance(ctx context.Context, ins *entity.Instance, idleTimeoutHours
 	resp, err := client.Get(url)
 	if err != nil {
 		// Record failure; after 3 consecutive failures mark as failed
-		handleFailure(ctx, ins)
+		s.handleFailure(ctx, ins)
 		return
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		handleFailure(ctx, ins)
+		s.handleFailure(ctx, ins)
 		return
 	}
 
 	var kernels []kernelInfo
 	if err = json.Unmarshal(body, &kernels); err != nil {
-		handleFailure(ctx, ins)
+		s.handleFailure(ctx, ins)
 		return
 	}
 
@@ -101,33 +110,35 @@ func processInstance(ctx context.Context, ins *entity.Instance, idleTimeoutHours
 	}
 
 	// Update last_active_at on successful check
+	cols := dao.Instances.Columns()
 	now := gtime.Now()
-	_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(do.Instance{LastActiveAt: now}).Update()
+	_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{LastActiveAt: now}).Update()
 
 	if len(kernels) == 0 || allIdle {
 		if ins.IdleSince == nil {
 			// Start counting idle time
-			_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(do.Instance{IdleSince: now}).Update()
+			_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{IdleSince: now}).Update()
 			return
 		}
 		// Check if idle timeout exceeded
 		if time.Since(ins.IdleSince.Time) >= time.Duration(idleTimeoutHours)*time.Hour {
 			g.Log().Infof(ctx, "cron: instance %d (%s) idle for >%dh, reclaiming", ins.Id, ins.Username, idleTimeoutHours)
-			reclaimInstance(ctx, ins)
+			s.reclaimInstance(ctx, ins)
 		}
 	} else {
 		// Active – reset idle_since
 		if ins.IdleSince != nil {
-			_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(g.Map{"idle_since": nil}).Update()
+			_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(g.Map{cols.IdleSince: nil}).Update()
 		}
 	}
 }
 
-func handleFailure(ctx context.Context, ins *entity.Instance) {
+func (s *Service) handleFailure(ctx context.Context, ins *entity.Instance) {
 	// Use idle_since as a consecutive-failure counter (simplification)
+	cols := dao.Instances.Columns()
 	now := gtime.Now()
 	if ins.IdleSince == nil {
-		_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(do.Instance{IdleSince: now}).Update()
+		_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{IdleSince: now}).Update()
 		return
 	}
 	// If 3+ failure periods (checkInterval * 3) have elapsed, mark as failed
@@ -135,18 +146,19 @@ func handleFailure(ctx context.Context, ins *entity.Instance) {
 	failThreshold := time.Duration(checkInterval*3) * time.Minute
 	if time.Since(ins.IdleSince.Time) >= failThreshold {
 		g.Log().Warningf(ctx, "cron: instance %d (%s) unreachable for 3+ checks, marking failed", ins.Id, ins.Username)
-		_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(do.Instance{Status: consts.StatusFailed}).Update()
+		_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{Status: consts.StatusFailed}).Update()
 	}
 }
 
-func reclaimInstance(ctx context.Context, ins *entity.Instance) {
+func (s *Service) reclaimInstance(ctx context.Context, ins *entity.Instance) {
 	// Delete K8S resources
 	_ = svcK8s.DeleteIngress(ctx, ins.Token)
 	_ = svcK8s.DeleteService(ctx, ins.Username)
 	_ = svcK8s.DeletePod(ctx, ins.Username)
 
+	cols := dao.Instances.Columns()
 	now := gtime.Now()
-	_, _ = dao.Instances.Ctx(ctx).Where("id", ins.Id).Data(do.Instance{
+	_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{
 		Status:    consts.StatusStopped,
 		StoppedAt: now,
 	}).Update()

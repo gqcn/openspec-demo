@@ -24,10 +24,19 @@ type PlatformClaims struct {
 	jwt.RegisteredClaims
 }
 
+// Service provides authentication business logic.
+type Service struct{}
+
+// New creates and returns a new Service instance.
+func New() *Service {
+	return &Service{}
+}
+
 // Login verifies credentials and returns a signed JWT token plus user claims.
-func Login(ctx context.Context, username, password string) (token string, claims *PlatformClaims, err error) {
+func (s *Service) Login(ctx context.Context, username, password string) (token string, claims *PlatformClaims, err error) {
+	cols := dao.Users.Columns()
 	var user *entity.User
-	err = dao.Users.Ctx(ctx).Where("username", username).Where("status", 1).Scan(&user)
+	err = dao.Users.Ctx(ctx).Where(cols.Username, username).Where(cols.Status, 1).Scan(&user)
 	if err != nil {
 		return "", nil, gerror.NewCode(gcode.CodeInternalError, "数据库查询失败")
 	}
@@ -57,7 +66,7 @@ func Login(ctx context.Context, username, password string) (token string, claims
 }
 
 // ParseToken parses and validates the JWT token, returning its claims.
-func ParseToken(ctx context.Context, tokenStr string) (*PlatformClaims, error) {
+func (s *Service) ParseToken(ctx context.Context, tokenStr string) (*PlatformClaims, error) {
 	secret := g.Cfg().MustGet(ctx, "jwt.secret", "changeme").String()
 	t, err := jwt.ParseWithClaims(tokenStr, &PlatformClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -76,7 +85,7 @@ func ParseToken(ctx context.Context, tokenStr string) (*PlatformClaims, error) {
 }
 
 // HashPassword generates a bcrypt hash for the given plain-text password.
-func HashPassword(password string) (string, error) {
+func (s *Service) HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err

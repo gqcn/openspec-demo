@@ -9,10 +9,22 @@ import (
 	"github.com/gqcn/platform/backend/internal/consts"
 	"github.com/gqcn/platform/backend/internal/model"
 	"github.com/gqcn/platform/backend/internal/service/auth"
+	"github.com/gqcn/platform/backend/internal/service/bizctx"
 )
 
+// Service provides HTTP middleware logic.
+type Service struct {
+	authSvc   *auth.Service
+	bizCtxSvc *bizctx.Service
+}
+
+// New creates and returns a new Service instance.
+func New(authSvc *auth.Service, bizCtxSvc *bizctx.Service) *Service {
+	return &Service{authSvc: authSvc, bizCtxSvc: bizCtxSvc}
+}
+
 // HandlerResponse is a middleware that wraps all handler responses into a unified JSON structure.
-func HandlerResponse(r *ghttp.Request) {
+func (s *Service) HandlerResponse(r *ghttp.Request) {
 	r.Middleware.Next()
 
 	// If a middleware (e.g. Auth) already wrote its own response, skip wrapping.
@@ -48,18 +60,18 @@ func HandlerResponse(r *ghttp.Request) {
 }
 
 // CORS sets permissive CORS headers.
-func CORS(r *ghttp.Request) {
+func (s *Service) CORS(r *ghttp.Request) {
 	r.Response.CORSDefault()
 	r.Middleware.Next()
 }
 
 // Auth validates the JWT Bearer token and injects ContextUser into the request context.
-func Auth(r *ghttp.Request) {
+func (s *Service) Auth(r *ghttp.Request) {
 	token := r.GetHeader("Authorization")
 	if len(token) > 7 && token[:7] == "Bearer " {
 		token = token[7:]
 	}
-	claims, err := auth.ParseToken(r.GetCtx(), token)
+	claims, err := s.authSvc.ParseToken(r.GetCtx(), token)
 	if err != nil {
 		r.Response.WriteJson(g.Map{
 			"code":    401,
@@ -79,17 +91,14 @@ func Auth(r *ghttp.Request) {
 }
 
 // AdminOnly allows only admin users (must be used after Auth middleware).
-func AdminOnly(r *ghttp.Request) {
-	u := r.GetCtxVar(consts.ContextKeyUser).Val()
+func (s *Service) AdminOnly(r *ghttp.Request) {
+	u := s.bizCtxSvc.GetContextUser(r.GetCtx())
 	if u == nil {
-
 		r.Response.WriteJson(g.Map{"code": 403, "message": "无权限", "data": nil})
 		r.ExitAll()
 		return
 	}
-	user := u.(*model.ContextUser)
-	if user.IsAdmin != 1 {
-
+	if u.IsAdmin != 1 {
 		r.Response.WriteJson(g.Map{"code": 403, "message": "仅管理员可操作", "data": nil})
 		r.ExitAll()
 		return

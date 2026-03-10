@@ -228,6 +228,19 @@
 ## Feedback
 
 - [x] **FB-1**：现有 e2e 测试仅覆盖单用户（admin）场景，未验证不同用户登录各自开发机后能否查看 /share 目录下的共享文件
+- [x] **FB-2**：规格管理列表和用户管理列表缺少分页组件，数据量大时无法翻页
+  - 修复：后端 spec/user list API 增加 page/size 参数与 total 返回；前端 SpecManageView、UserManageView 添加 `el-pagination` 组件
+  - 测试：TC0016a~TC0016e（分页组件可见、API 返回 total 字段、分页参数生效）
+- [x] **FB-3**：规格管理列表后端 SpecItem 未返回 createdAt 字段，前端表格创建时间列为空
+  - 修复：`api/spec/v1/list.go` SpecItem 增加 `CreatedAt string`；controller 映射 `Format("Y-m-d H:i:s")`
+  - 测试：TC0016c（规格管理列表创建时间列有数据）
+- [x] **FB-4**：创建用户时若 username 与已软删除用户重复，应使用 Unscoped 绕过软删除过滤进行唯一性检查，避免 INSERT 触发唯一索引冲突
+  - 修复：`user.Create()` 重复检查改用 `dao.Users.Ctx(ctx).TX(tx).Unscoped().Where(...)` 含已删除用户
+  - 测试：TC0017a（创建→删除→再创建同名用户返回友好错误而非 SQL 异常）
+- [x] **FB-5**：开发机 Pod 未设置 NB_USER 环境变量且 home 挂载到 /home/jovyan，导致 Terminal 显示 jovyan 而非真实用户名，home 路径应当为 /home/{username}
+  - 修复：`pod.go` 增加 `NB_USER` 环境变量；启动命令增加 `ln -sfn /data/home/{username} /home/{username}`；volume mount 改为 `/data/home`
+  - 测试：TC0018a~TC0018d（NB_USER 环境变量、/home/admin 软链、passwd 中用户记录）
+  - 回归修复：TC0013 `/home/jovyan` → `/home/admin` 路径更新
 - [x] **FB-2**：JWT 过期后访问 /notebooks 等页面仍可正常展示，不会跳转登录页
   - 修复：在 `frontend/src/router/index.ts` 路由守卫中增加 `isTokenExpired()` 函数，解码 JWT payload 检查 `exp` 字段，过期时清除 auth 状态并跳转 /login
   - 测试：TC0010a~TC0010c（新增 TC0010c 过期 JWT 场景）

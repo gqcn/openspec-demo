@@ -7,6 +7,9 @@ const specs = ref<Spec[]>([])
 const loading = ref(false)
 const showDialog = ref(false)
 const editingSpec = ref<Spec | null>(null)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 
 const form = reactive({
   name: '',
@@ -26,8 +29,9 @@ const rules = {
 async function fetchList() {
   loading.value = true
   try {
-    const res = await listSpecs()
+    const res = await listSpecs(currentPage.value, pageSize.value)
     specs.value = res.data || []
+    total.value = res.total || 0
   } finally {
     loading.value = false
   }
@@ -132,6 +136,18 @@ onMounted(fetchList)
         </template>
       </el-table-column>
     </el-table>
+
+    <div style="margin-top: 20px; display: flex; justify-content: flex-end">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="fetchList"
+        @current-change="fetchList"
+      />
+    </div>
 
     <el-dialog
       v-model="showDialog"

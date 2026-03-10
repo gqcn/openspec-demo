@@ -31,9 +31,9 @@ export interface UpdateSpecReq {
   enabled?: number
 }
 
-export async function listSpecs(): Promise<{ code: number; data: Spec[] }> {
-  const res: any = await http.get('/spec')
-  return { code: res.code, data: res.data?.list || [] }
+export async function listSpecs(page = 1, size = 20): Promise<{ code: number; data: Spec[]; total: number }> {
+  const res: any = await http.get('/spec', { params: { page, size } })
+  return { code: res.code, data: res.data?.list || [], total: res.data?.total || 0 }
 }
 
 export function createSpec(data: CreateSpecReq) {

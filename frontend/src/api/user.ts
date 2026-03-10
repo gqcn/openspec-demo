@@ -15,9 +15,9 @@ export interface CreateUserReq {
   isAdmin: number
 }
 
-export async function listUsers(): Promise<{ code: number; data: User[] }> {
-  const res: any = await http.get('/user', { params: { page: 1, size: 1000 } })
-  return { code: res.code, data: res.data?.list || [] }
+export async function listUsers(page = 1, size = 20): Promise<{ code: number; data: User[]; total: number }> {
+  const res: any = await http.get('/user', { params: { page, size } })
+  return { code: res.code, data: res.data?.list || [], total: res.data?.total || 0 }
 }
 
 export function createUser(data: CreateUserReq) {

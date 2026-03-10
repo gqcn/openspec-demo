@@ -17,6 +17,10 @@ dev:
 	@# ── 停掉旧进程 ──────────────────────────────────────────────
 	@if [ -f $(BACKEND_PID) ]; then kill $$(cat $(BACKEND_PID)) 2>/dev/null || true; fi
 	@if [ -f $(FRONTEND_PID) ]; then kill $$(cat $(FRONTEND_PID)) 2>/dev/null || true; fi
+	@# ── 编译后端 ────────────────────────────────────────────────
+	@echo "正在编译后端..."
+	@cd $(BACKEND_DIR) && go build -o bin/platform . || { echo "后端编译失败"; exit 1; }
+	@echo "✓ 后端编译成功"
 	@# ── 启动后端 ────────────────────────────────────────────────
 	@cd $(BACKEND_DIR) && ./bin/platform >> /tmp/backend.log 2>&1 & echo $$! > $(BACKEND_PID)
 	@sleep 1

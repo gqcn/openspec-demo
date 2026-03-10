@@ -98,6 +98,8 @@ test.describe('TC0009 多用户 /share 共享目录', () => {
     await nbUser.goto()
     await nbUser.stopNotebook()
     await nbUser.waitUntilStopped()
+    await nbUser.goto()
+    await nbUser.deleteRecord()
 
     // Switch back to admin
     const layoutUser = new MainLayout(adminPage)

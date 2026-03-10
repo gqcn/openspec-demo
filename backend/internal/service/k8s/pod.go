@@ -77,6 +77,13 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 		homeDir, opts.Uid, opts.Uid, homeDir, homeDir,
 	)
 
+	// Main container startup command: symlink NFS user home to /home/{username},
+	// then hand over to start.sh which reads NB_USER/NB_UID/NB_GID for user switching.
+	mainCmd := fmt.Sprintf(
+		"set -e; ln -sfn /data/home/%s /home/%s; exec /usr/local/bin/start.sh start-notebook.sh",
+		opts.Username, opts.Username,
+	)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -119,19 +126,14 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 					Name:            "jupyterlab",
 					Image:           opts.Image,
 					ImagePullPolicy: corev1.PullIfNotPresent,
-					// Use start-notebook.sh without inline args; pass config via env vars
-					// (compatible with jupyter/base-notebook 4.x / jupyter_server 2.x)
+					Command:         []string{"/bin/bash", "-c", mainCmd},
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser: ptrInt64(0),
 					},
 					Env: []corev1.EnvVar{
 						{Name: "NB_UID", Value: fmt.Sprintf("%d", opts.Uid)},
 						{Name: "NB_GID", Value: fmt.Sprintf("%d", opts.Uid)},
-						// NB_USER is intentionally omitted: the initContainer already handles
-						// ownership of /home/jovyan via chown, and renaming the jovyan user
-						// inside the container is unnecessary and can fail for some usernames.
-						// CHOWN_HOME is omitted for the same reason: initContainer handles it,
-						// and recursive NFS chown significantly delays container startup.
+						{Name: "NB_USER", Value: opts.Username},
 						// Disable token auth: routing token in URL path is the security boundary.
 						{Name: "NOTEBOOK_ARGS", Value: fmt.Sprintf("--ServerApp.base_url=%s --ServerApp.token= --ServerApp.password='' --ServerApp.allow_origin='*'", baseURL)},
 					},
@@ -142,8 +144,8 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "jupyter-shared",
-							MountPath: "/home/jovyan",
-							SubPath:   fmt.Sprintf("%s/%s", consts.NFSHomeSubPath, opts.Username),
+							MountPath: "/data/home",
+							SubPath:   consts.NFSHomeSubPath,
 						},
 						{
 							Name:      "jupyter-shared",

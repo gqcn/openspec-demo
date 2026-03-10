@@ -20,21 +20,34 @@ import (
 	"github.com/gqcn/platform/backend/internal/service/spec"
 )
 
+// Service provides JupyterLab instance lifecycle management business logic.
+type Service struct {
+	specSvc  *spec.Service
+	imageSvc *image.Service
+}
+
+// New creates and returns a new Service instance.
+func New(specSvc *spec.Service, imageSvc *image.Service) *Service {
+	return &Service{specSvc: specSvc, imageSvc: imageSvc}
+}
+
 // List returns all instances for the requesting user (or all if admin).
-func List(ctx context.Context, userId uint, isAdmin uint) (list []*entity.Instance, err error) {
+func (s *Service) List(ctx context.Context, userId uint, isAdmin uint) (list []*entity.Instance, err error) {
+	cols := dao.Instances.Columns()
 	m := dao.Instances.Ctx(ctx)
 	if isAdmin != 1 {
-		m = m.Where("user_id", userId)
+		m = m.Where(cols.UserId, userId)
 	}
-	err = m.OrderDesc("created_at").Scan(&list)
+	err = m.OrderDesc(cols.CreatedAt).Scan(&list)
 	return
 }
 
 // GetById returns a single instance; non-admin can only see their own.
-func GetById(ctx context.Context, id, userId uint, isAdmin uint) (ins *entity.Instance, err error) {
-	m := dao.Instances.Ctx(ctx).Where("id", id)
+func (s *Service) GetById(ctx context.Context, id, userId uint, isAdmin uint) (ins *entity.Instance, err error) {
+	cols := dao.Instances.Columns()
+	m := dao.Instances.Ctx(ctx).Where(cols.Id, id)
 	if isAdmin != 1 {
-		m = m.Where("user_id", userId)
+		m = m.Where(cols.UserId, userId)
 	}
 	err = m.Scan(&ins)
 	if err != nil {
@@ -47,11 +60,12 @@ func GetById(ctx context.Context, id, userId uint, isAdmin uint) (ins *entity.In
 }
 
 // Create provisions a new JupyterLab instance for the user.
-func Create(ctx context.Context, userId uint, username string, uid uint, specId uint, imageKey string) (ins *entity.Instance, err error) {
+func (s *Service) Create(ctx context.Context, userId uint, username string, uid uint, specId uint, imageKey string) (ins *entity.Instance, err error) {
+	cols := dao.Instances.Columns()
 	// 1. Verify user has no active instance
 	count, err := dao.Instances.Ctx(ctx).
-		Where("user_id", userId).
-		WhereIn("status", []string{consts.StatusCreating, consts.StatusRunning, consts.StatusStopping}).
+		Where(cols.UserId, userId).
+		WhereIn(cols.Status, []string{consts.StatusCreating, consts.StatusRunning, consts.StatusStopping}).
 		Count()
 	if err != nil {
 		return nil, err
@@ -62,18 +76,18 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 
 	// 1b. Clean up stale stopped/failed records for this user before creating a new one.
 	_, _ = dao.Instances.Ctx(ctx).
-		Where("user_id", userId).
-		WhereIn("status", []string{consts.StatusStopped, consts.StatusFailed}).
+		Where(cols.UserId, userId).
+		WhereIn(cols.Status, []string{consts.StatusStopped, consts.StatusFailed}).
 		Delete()
 
 	// 2. Validate spec
-	sp, err := spec.GetById(ctx, specId)
+	sp, err := s.specSvc.GetById(ctx, specId)
 	if err != nil {
 		return nil, err
 	}
 
 	// 3. Validate image
-	imgCfg, err := image.GetByKey(ctx, imageKey)
+	imgCfg, err := s.imageSvc.GetByKey(ctx, imageKey)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +132,7 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 			_ = svcK8s.DeleteIngress(bgCtx, token)
 			_ = svcK8s.DeleteService(bgCtx, username)
 			_ = svcK8s.DeletePod(bgCtx, username)
-			_, _ = dao.Instances.Ctx(bgCtx).Where("id", instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
+			_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
 		}
 
 		if e := svcK8s.CreatePod(bgCtx, svcK8s.PodOptions{
@@ -149,7 +163,7 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 				continue
 			}
 			if phase == "Running" {
-				_, _ = dao.Instances.Ctx(bgCtx).Where("id", instanceId).Data(do.Instance{
+				_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, instanceId).Data(do.Instance{
 					Status:   consts.StatusRunning,
 					PodIp:    podIP,
 					NodeName: nodeName,
@@ -167,20 +181,21 @@ func Create(ctx context.Context, userId uint, username string, uid uint, specId 
 
 	// Return immediately with the record
 	var created entity.Instance
-	_ = dao.Instances.Ctx(ctx).Where("id", instanceId).Scan(&created)
+	_ = dao.Instances.Ctx(ctx).Where(cols.Id, instanceId).Scan(&created)
 	return &created, nil
 }
 
 // Delete stops and removes the JupyterLab instance.
-func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
-	ins, err := GetById(ctx, id, userId, isAdmin)
+func (s *Service) Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
+	ins, err := s.GetById(ctx, id, userId, isAdmin)
 	if err != nil {
 		return err
 	}
 
+	cols := dao.Instances.Columns()
 	// For stopped instances, K8S resources were already cleaned up during the stop operation.
 	if ins.Status == consts.StatusStopped {
-		_, err = dao.Instances.Ctx(ctx).Where("id", id).Delete()
+		_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Delete()
 		return err
 	}
 
@@ -191,12 +206,12 @@ func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
 		_ = svcK8s.DeleteIngress(ctx, ins.Token)
 		_ = svcK8s.DeleteService(ctx, ins.Username)
 		_ = svcK8s.DeletePod(ctx, ins.Username)
-		_, err = dao.Instances.Ctx(ctx).Where("id", id).Delete()
+		_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Delete()
 		return err
 	}
 
 	// Mark as stopping in DB
-	_, err = dao.Instances.Ctx(ctx).Where("id", id).Data(do.Instance{Status: consts.StatusStopping}).Update()
+	_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Data(do.Instance{Status: consts.StatusStopping}).Update()
 	if err != nil {
 		return err
 	}
@@ -208,7 +223,7 @@ func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
 
 	// Mark as stopped
 	now := gtime.Now()
-	_, err = dao.Instances.Ctx(ctx).Where("id", id).Data(do.Instance{
+	_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Data(do.Instance{
 		Status:    consts.StatusStopped,
 		StoppedAt: now,
 	}).Update()
@@ -216,8 +231,8 @@ func Delete(ctx context.Context, id, userId uint, isAdmin uint) error {
 }
 
 // Restart deletes the Pod and recreates it keeping the same token and DB record.
-func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
-	ins, err := GetById(ctx, id, userId, isAdmin)
+func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
+	ins, err := s.GetById(ctx, id, userId, isAdmin)
 	if err != nil {
 		return err
 	}
@@ -225,11 +240,12 @@ func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "只有运行中或失败的实例才可重启")
 	}
 
+	cols := dao.Instances.Columns()
 	// Delete old Pod (Service + Ingress stay)
 	_ = svcK8s.DeletePod(ctx, ins.Username)
 
 	// Mark creating
-	_, err = dao.Instances.Ctx(ctx).Where("id", id).Data(do.Instance{
+	_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Data(do.Instance{
 		Status: consts.StatusCreating,
 		PodIp:  "",
 	}).Update()
@@ -238,11 +254,11 @@ func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
 	}
 
 	// Reload spec + image
-	sp, err := spec.GetById(ctx, ins.SpecId)
+	sp, err := s.specSvc.GetById(ctx, ins.SpecId)
 	if err != nil {
 		return err
 	}
-	imgCfg, err := image.GetByKey(ctx, ins.ImageKey)
+	imgCfg, err := s.imageSvc.GetByKey(ctx, ins.ImageKey)
 	if err != nil || imgCfg == nil {
 		return gerror.New("镜像配置丢失")
 	}
@@ -266,7 +282,7 @@ func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
 			Tolerations:  sp.Tolerations,
 			PVCName:      pvcName,
 		}); e != nil {
-			_, _ = dao.Instances.Ctx(bgCtx).Where("id", id).Data(do.Instance{Status: consts.StatusFailed}).Update()
+			_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, id).Data(do.Instance{Status: consts.StatusFailed}).Update()
 			return
 		}
 		deadline := time.Now().Add(5 * time.Minute)
@@ -277,7 +293,7 @@ func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
 				continue
 			}
 			if phase == "Running" {
-				_, _ = dao.Instances.Ctx(bgCtx).Where("id", id).Data(do.Instance{
+				_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, id).Data(do.Instance{
 					Status:   consts.StatusRunning,
 					PodIp:    podIP,
 					NodeName: nodeName,
@@ -285,17 +301,17 @@ func Restart(ctx context.Context, id, userId uint, isAdmin uint) error {
 				return
 			}
 			if phase == "Failed" {
-				_, _ = dao.Instances.Ctx(bgCtx).Where("id", id).Data(do.Instance{Status: consts.StatusFailed}).Update()
+				_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, id).Data(do.Instance{Status: consts.StatusFailed}).Update()
 				return
 			}
 		}
-		_, _ = dao.Instances.Ctx(context.Background()).Where("id", id).Data(do.Instance{Status: consts.StatusFailed}).Update()
+		_, _ = dao.Instances.Ctx(context.Background()).Where(cols.Id, id).Data(do.Instance{Status: consts.StatusFailed}).Update()
 	}()
 	return nil
 }
 
 // AccessURL builds the full public URL for an instance.
-func AccessURL(ctx context.Context, token string) string {
+func (s *Service) AccessURL(ctx context.Context, token string) string {
 	base := g.Cfg().MustGet(ctx, "notebook.accessBaseURL", "https://platform.internal").String()
 	return fmt.Sprintf("%s/jupyter/%s/", base, token)
 }

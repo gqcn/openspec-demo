@@ -16,8 +16,16 @@ type ImageConfig struct {
 	Enabled     bool   `yaml:"enabled"`
 }
 
+// Service provides image configuration business logic.
+type Service struct{}
+
+// New creates and returns a new Service instance.
+func New() *Service {
+	return &Service{}
+}
+
 // List returns all enabled images from the application config file.
-func List(ctx context.Context) (list []ImageConfig, err error) {
+func (s *Service) List(ctx context.Context) (list []ImageConfig, err error) {
 	var all []ImageConfig
 	err = g.Cfg().MustGet(ctx, "images").Scan(&all)
 	if err != nil {
@@ -32,8 +40,8 @@ func List(ctx context.Context) (list []ImageConfig, err error) {
 }
 
 // GetByKey returns a single image config by key, or nil if not found.
-func GetByKey(ctx context.Context, key string) (*ImageConfig, error) {
-	all, err := List(ctx)
+func (s *Service) GetByKey(ctx context.Context, key string) (*ImageConfig, error) {
+	all, err := s.List(ctx)
 	if err != nil {
 		return nil, err
 	}

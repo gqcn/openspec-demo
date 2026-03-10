@@ -4,12 +4,11 @@ import (
 	"context"
 
 	v1 "github.com/gqcn/platform/backend/api/image/v1"
-	svcImage "github.com/gqcn/platform/backend/internal/service/image"
 )
 
 // List handles GET /api/image.
 func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
-	list, err := svcImage.List(ctx)
+	list, err := c.imageSvc.List(ctx)
 	if err != nil {
 		return nil, err
 	}

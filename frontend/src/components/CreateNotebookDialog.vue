@@ -18,7 +18,7 @@ const selectedImage = ref('')
 const loading = ref(false)
 
 onMounted(async () => {
-  const [sr, ir] = await Promise.all([listSpecs(), listImages()])
+  const [sr, ir] = await Promise.all([listSpecs(1, 1000), listImages()])
   specs.value = (sr.data || []).filter((s: Spec) => s.enabled === 1)
   images.value = ir.data || []
 })
