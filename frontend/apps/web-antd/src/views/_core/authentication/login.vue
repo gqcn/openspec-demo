@@ -36,7 +36,7 @@ const formSchema = computed((): VbenFormSchema[] => {
         size: 'large',
         placeholder: $t('authentication.passwordTip'),
       },
-      defaultValue: 'admin123',
+      defaultValue: 'Admin@123456',
       fieldName: 'password',
       label: $t('authentication.password'),
       rules: z.string().min(5, { message: $t('authentication.passwordTip') }),
@@ -57,6 +57,9 @@ async function handleAccountLogin(values: LoginAndRegisterParams) {
   <AuthenticationLogin
     :form-schema="formSchema"
     :loading="authStore.loginLoading"
+    :show-code-login="false"
+    :show-forget-password="false"
+    :show-qrcode-login="false"
     :show-register="false"
     :show-third-party-login="false"
     @submit="handleAccountLogin"

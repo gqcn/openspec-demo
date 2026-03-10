@@ -62,7 +62,7 @@ watch(
         :menus
         :text="userStore.userInfo?.realName"
         :description="userStore.userInfo?.username"
-        tag-text="AI 训练平台"
+        tag-text="AI开发训练平台"
         @logout="handleLogout"
       />
     </template>

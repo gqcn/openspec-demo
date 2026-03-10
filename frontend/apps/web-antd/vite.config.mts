@@ -5,6 +5,7 @@ export default defineConfig(async () => {
     application: {},
     vite: {
       server: {
+        allowedHosts: ['localhost'],
         proxy: {
           '/api': {
             changeOrigin: true,

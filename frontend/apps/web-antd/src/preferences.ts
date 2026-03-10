@@ -17,7 +17,7 @@ export const overridesPreferences = defineOverridesPreferences({
     persist: false,
   },
   theme: {
-    semiDarkSidebar: true,
+    semiDarkSidebar: false,
     radius: '0.375',
   },
 });

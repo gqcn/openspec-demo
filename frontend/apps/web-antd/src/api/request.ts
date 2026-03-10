@@ -157,4 +157,25 @@ function createRequestClient(baseURL: string) {
 
 export const requestClient = createRequestClient(apiURL);
 
-export const baseRequestClient = new RequestClient({ baseURL: apiURL });
+function createBaseRequestClient(baseURL: string) {
+  const client = new RequestClient({ baseURL });
+
+  // Unwrap GoFrame {code, data, message} response format
+  client.addResponseInterceptor<HttpResponse>({
+    fulfilled: async (response) => {
+      const axiosResponseData = response.data;
+      if (!axiosResponseData) {
+        throw new Error('API request failed');
+      }
+      const { code, data, message: msg } = axiosResponseData;
+      if (Reflect.has(axiosResponseData, 'code') && code === GOFRAME_SUCCESS_CODE) {
+        return data;
+      }
+      throw new Error(msg || 'API request failed');
+    },
+  });
+
+  return client;
+}
+
+export const baseRequestClient = createBaseRequestClient(apiURL);

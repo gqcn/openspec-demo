@@ -14,9 +14,7 @@ export function transformUserInfo(
     realName: userData.username,
     avatar: '',
     desc: '',
-    roles: userData.isAdmin
-      ? [{ roleName: 'admin', value: 'admin' }]
-      : [{ roleName: 'user', value: 'user' }],
+    roles: userData.isAdmin ? ['admin'] : ['user'],
     homePath: '/notebooks',
   };
 }

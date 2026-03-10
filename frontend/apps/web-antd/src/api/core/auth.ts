@@ -19,7 +19,7 @@ export namespace AuthApi {
  * Login API - uses baseRequestClient (no auth header needed)
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  return baseRequestClient.post<AuthApi.LoginResult>('/api/auth/login', data);
+  return baseRequestClient.post<AuthApi.LoginResult>('/auth/login', data);
 }
 
 /**
