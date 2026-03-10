@@ -10,6 +10,11 @@ export const overridesPreferences = defineOverridesPreferences({
     defaultHomePath: '/notebooks',
     name: import.meta.env.VITE_APP_TITLE,
   },
+  copyright: {
+    companyName: '',
+    companySiteLink: '',
+    enable: false,
+  },
   footer: {
     enable: false,
   },

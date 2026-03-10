@@ -430,20 +430,8 @@ async function handleReset() {
                 v-model:footer-fixed="footerFixed"
               />
             </Block>
-            <Block
-              v-if="copyrightSettingShow"
-              :title="$t('preferences.copyright.title')"
-            >
-              <Copyright
-                v-model:copyright-company-name="copyrightCompanyName"
-                v-model:copyright-company-site-link="copyrightCompanySiteLink"
-                v-model:copyright-date="copyrightDate"
-                v-model:copyright-enable="copyrightEnable"
-                v-model:copyright-icp="copyrightIcp"
-                v-model:copyright-icp-link="copyrightIcpLink"
-                :disabled="!footerEnable"
-              />
-            </Block>
+            <!-- Copyright settings hidden -->
+
           </template>
 
           <template #shortcutKey>

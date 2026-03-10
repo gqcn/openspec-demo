@@ -11,26 +11,26 @@ export const querySchema: FormSchemaGetter = () => [
 ];
 
 export const columns: VxeGridPropTypes.Columns = [
-  { field: 'id', title: 'ID', width: 60 },
-  { field: 'username', title: '用户名', width: 150 },
-  { field: 'uid', title: 'UID', width: 90 },
+  { field: 'id', title: 'ID', minWidth: 60 },
+  { field: 'username', title: '用户名', minWidth: 150 },
+  { field: 'uid', title: 'UID', minWidth: 90 },
   {
     field: 'isAdmin',
     title: '角色',
-    width: 90,
+    minWidth: 90,
     slots: { default: 'role' },
   },
   {
     field: 'status',
     title: '状态',
-    width: 90,
+    minWidth: 90,
     slots: { default: 'status' },
   },
-  { field: 'createdAt', title: '创建时间', width: 180 },
+  { field: 'createdAt', title: '创建时间', minWidth: 180 },
   {
     field: 'action',
     title: '操作',
-    width: 200,
+    minWidth: 200,
     fixed: 'right',
     slots: { default: 'action' },
   },

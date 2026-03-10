@@ -294,6 +294,16 @@
   - 修复：`model/context.go` 新增 `GetContextUser(ctx)` 函数；`spec_v1_handlers.go` 和 `notebook_v1_handlers.go` 均改用该函数，移除各自的内联提取逻辑
 - [x] **FB-21**：`notebook.Create()` 后台 goroutine 使用 `context.Background()` 丢失链路追踪信息，应改用 `context.WithoutCancel(ctx)`
   - 修复：`notebook.go` goroutine 内 `bgCtx := context.Background()` 改为 `bgCtx := context.WithoutCancel(ctx)`
+- [x] **FB-22**：右上角用户头像下拉中去掉"AI开发训练平台"标签文字
+  - 修复：`basic.vue` 移除 `tag-text="AI开发训练平台"` prop
+- [x] **FB-23**：用户列表和规格列表页面中，表格列信息应平铺展示（去掉固定宽度，让列自动填充）
+  - 修复：`user/data.ts` 和 `spec/data.ts` 所有列 `width` 改为 `minWidth`，表格自动填充剩余空间
+- [x] **FB-24**：用户列表和规格列表页面中，去掉顶部搜索框
+  - 修复：`user/index.vue` 和 `spec/index.vue` 移除 `formOptions` 配置及客户端过滤逻辑
+- [x] **FB-25**：去掉登录页底部版权信息中的 Vben Admin 字样
+  - 修复：`preferences.ts` 新增 `copyright: { companyName: '', companySiteLink: '', enable: false }` 覆盖默认值
+- [x] **FB-26**：偏好设置面板中，去掉"布局"栏目下的"版权"设置区块
+  - 修复：`preferences-drawer.vue` 注释掉版权设置 Block
 
 ---
 

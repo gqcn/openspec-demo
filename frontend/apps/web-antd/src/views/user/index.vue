@@ -11,7 +11,7 @@ import {
   userStatusChange,
 } from '#/api/user';
 
-import { columns, querySchema } from './data';
+import { columns } from './data';
 import UserDrawer from './user-drawer.vue';
 
 const [UserDrawerComp, userDrawerApi] = useVbenDrawer({
@@ -19,25 +19,13 @@ const [UserDrawerComp, userDrawerApi] = useVbenDrawer({
 });
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  formOptions: {
-    schema: querySchema(),
-  },
   gridOptions: {
     columns,
     proxyConfig: {
       ajax: {
-        query: async ({ page, form }) => {
+        query: async ({ page }) => {
           const result = await userList(page.currentPage, page.pageSize);
-          // Client-side username filter if form has username
-          let list = result.list;
-          if (form?.username) {
-            list = list.filter((item: User) =>
-              item.username
-                .toLowerCase()
-                .includes(form.username.toLowerCase()),
-            );
-          }
-          return { rows: list, total: result.total };
+          return { rows: result.list, total: result.total };
         },
       },
     },

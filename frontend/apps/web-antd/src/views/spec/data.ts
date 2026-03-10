@@ -11,18 +11,18 @@ export const querySchema: FormSchemaGetter = () => [
 ];
 
 export const columns: VxeGridPropTypes.Columns = [
-  { field: 'id', title: 'ID', width: 60 },
-  { field: 'name', title: '名称', width: 160 },
-  { field: 'cpu', title: 'CPU', width: 100 },
-  { field: 'memory', title: '内存', width: 100 },
-  { field: 'gpu', title: 'GPU 数量', width: 90 },
-  { field: 'gpuType', title: 'GPU 型号', width: 140 },
-  { field: 'enabled', title: '状态', width: 90, slots: { default: 'status' } },
-  { field: 'createdAt', title: '创建时间', width: 180 },
+  { field: 'id', title: 'ID', minWidth: 60 },
+  { field: 'name', title: '名称', minWidth: 160 },
+  { field: 'cpu', title: 'CPU', minWidth: 100 },
+  { field: 'memory', title: '内存', minWidth: 100 },
+  { field: 'gpu', title: 'GPU 数量', minWidth: 90 },
+  { field: 'gpuType', title: 'GPU 型号', minWidth: 140 },
+  { field: 'enabled', title: '状态', minWidth: 90, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', minWidth: 180 },
   {
     field: 'action',
     title: '操作',
-    width: 200,
+    minWidth: 200,
     fixed: 'right',
     slots: { default: 'action' },
   },

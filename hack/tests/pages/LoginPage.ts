@@ -14,12 +14,12 @@ export class LoginPage {
     this.page = page
     this.usernameInput = page.getByPlaceholder('请输入用户名')
     this.passwordInput = page.getByPlaceholder('请输入密码')
-    this.loginButton = page.getByRole('button', { name: '登 录' })
+    this.loginButton = page.getByRole('button', { name: 'login' })
     this.errorMessage = page.locator('.el-message--error')
   }
 
   async goto() {
-    await this.page.goto('/login')
+    await this.page.goto('/auth/login')
   }
 
   async login(username: string, password: string) {

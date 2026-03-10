@@ -6,7 +6,7 @@ import { Button, message, Popconfirm, Tag } from 'ant-design-vue';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { type Spec, specDelete, specList, specUpdate } from '#/api/spec';
 
-import { columns, querySchema } from './data';
+import { columns } from './data';
 import SpecDrawer from './spec-drawer.vue';
 
 const [SpecDrawerComp, specDrawerApi] = useVbenDrawer({
@@ -14,23 +14,13 @@ const [SpecDrawerComp, specDrawerApi] = useVbenDrawer({
 });
 
 const [Grid, gridApi] = useVbenVxeGrid({
-  formOptions: {
-    schema: querySchema(),
-  },
   gridOptions: {
     columns,
     proxyConfig: {
       ajax: {
-        query: async ({ page, form }) => {
+        query: async ({ page }) => {
           const result = await specList(page.currentPage, page.pageSize);
-          // Client-side name filter if form has name
-          let list = result.list;
-          if (form?.name) {
-            list = list.filter((item: Spec) =>
-              item.name.toLowerCase().includes(form.name.toLowerCase()),
-            );
-          }
-          return { rows: list, total: result.total };
+          return { rows: result.list, total: result.total };
         },
       },
     },
