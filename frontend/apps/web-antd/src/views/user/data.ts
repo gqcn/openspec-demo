@@ -11,22 +11,24 @@ export const querySchema: FormSchemaGetter = () => [
 ];
 
 export const columns: VxeGridPropTypes.Columns = [
-  { field: 'id', title: 'ID', minWidth: 60 },
-  { field: 'username', title: '用户名', minWidth: 150 },
-  { field: 'uid', title: 'UID', minWidth: 90 },
+  { field: 'id', title: 'ID', minWidth: 60, sortable: true },
+  { field: 'username', title: '用户名', minWidth: 150, sortable: true },
+  { field: 'uid', title: 'UID', minWidth: 90, sortable: true },
   {
     field: 'isAdmin',
     title: '角色',
     minWidth: 90,
+    sortable: true,
     slots: { default: 'role' },
   },
   {
     field: 'status',
     title: '状态',
     minWidth: 90,
+    sortable: true,
     slots: { default: 'status' },
   },
-  { field: 'createdAt', title: '创建时间', minWidth: 180 },
+  { field: 'createdAt', title: '创建时间', minWidth: 180, sortable: true },
   {
     field: 'action',
     title: '操作',
@@ -42,6 +44,9 @@ export const createSchema: FormSchemaGetter = () => [
     fieldName: 'username',
     label: '用户名',
     rules: 'required',
+    componentProps: {
+      disabled: false,
+    },
   },
   {
     component: 'InputPassword',
@@ -54,6 +59,7 @@ export const createSchema: FormSchemaGetter = () => [
     fieldName: 'isAdmin',
     label: '角色',
     defaultValue: 0,
+    rules: 'required',
     componentProps: {
       buttonStyle: 'solid',
       optionType: 'button',

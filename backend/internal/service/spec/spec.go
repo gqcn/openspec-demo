@@ -27,7 +27,7 @@ func (s *Service) List(ctx context.Context, page, size int) (list []*entity.Spec
 	if err != nil {
 		return
 	}
-	err = m.Page(page, size).OrderAsc(cols.SortOrder).Scan(&list)
+	err = m.Page(page, size).OrderAsc(cols.Id).Scan(&list)
 	return
 }
 
@@ -39,14 +39,14 @@ func (s *Service) ListAll(ctx context.Context, page, size int) (list []*entity.S
 	if err != nil {
 		return
 	}
-	err = m.Page(page, size).OrderAsc(cols.SortOrder).Scan(&list)
+	err = m.Page(page, size).OrderAsc(cols.Id).Scan(&list)
 	return
 }
 
 // ListAllUnpaged returns all specs without pagination (for internal lookups like spec name maps).
 func (s *Service) ListAllUnpaged(ctx context.Context) (list []*entity.Spec, err error) {
 	cols := dao.Specs.Columns()
-	err = dao.Specs.Ctx(ctx).OrderAsc(cols.SortOrder).Scan(&list)
+	err = dao.Specs.Ctx(ctx).OrderAsc(cols.Id).Scan(&list)
 	return
 }
 

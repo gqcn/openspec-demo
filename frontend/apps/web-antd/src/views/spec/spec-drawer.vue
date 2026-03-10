@@ -52,7 +52,7 @@ const [Drawer, drawerApi] = useVbenDrawer({
   onOpenChange(isOpen: boolean) {
     if (isOpen) {
       const data = drawerApi.getData<Record<string, any>>();
-      if (data) {
+      if (data && data.id) {
         recordData.value = data;
         formApi.setValues(data);
       } else {

@@ -304,6 +304,14 @@
   - 修复：`preferences.ts` 新增 `copyright: { companyName: '', companySiteLink: '', enable: false }` 覆盖默认值
 - [x] **FB-26**：偏好设置面板中，去掉"布局"栏目下的"版权"设置区块
   - 修复：`preferences-drawer.vue` 注释掉版权设置 Block
+- [x] **FB-27**：新增用户时，用户名无法输入（编辑用户后 disabled 状态残留到新增表单）
+  - 修复：`user-drawer.vue` 的 `onOpenChange` 中 `getData()` 返回空对象 `{}` 被误判为编辑模式，改为检查 `data && data.id`；同步修复 `spec-drawer.vue`
+- [x] **FB-28**：新增用户时，角色字段缺少必填校验
+  - 修复：`user/data.ts` 的 `createSchema` 中 `isAdmin` 字段添加 `rules: 'required'`
+- [x] **FB-29**：规格列表默认按 sort_order 排序，应改为按自增 ID 排序
+  - 修复：`spec/spec.go` 的 `List`、`ListAll`、`ListAllUnpaged` 三个方法 `OrderAsc(cols.SortOrder)` 改为 `OrderAsc(cols.Id)`
+- [x] **FB-30**：用户列表和规格列表的常见列缺少点击排序功能
+  - 修复：`user/data.ts` 和 `spec/data.ts` 常见列添加 `sortable: true`
 
 ---
 

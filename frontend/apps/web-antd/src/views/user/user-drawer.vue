@@ -58,7 +58,7 @@ const [Drawer, drawerApi] = useVbenDrawer({
   onOpenChange(isOpen: boolean) {
     if (isOpen) {
       const data = drawerApi.getData<Record<string, any>>();
-      if (data) {
+      if (data && data.id) {
         recordData.value = data;
         formApi.setState({ schema: editSchema() });
         // Use nextTick-like delay to ensure schema is applied before setting values
@@ -67,6 +67,7 @@ const [Drawer, drawerApi] = useVbenDrawer({
         }, 0);
       } else {
         recordData.value = null;
+        formApi.resetForm();
         formApi.setState({ schema: createSchema() });
       }
     }
