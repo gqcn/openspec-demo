@@ -11,14 +11,9 @@ import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 import { notification } from 'ant-design-vue';
 import { defineStore } from 'pinia';
 
-import { doLogout, getUserInfoApi, loginApi, seeConnectionClose } from '#/api';
-import {
-  ImpossibleReturn401Exception,
-  UnauthorizedException,
-} from '#/api/helper';
+import { doLogout, getUserInfoApi, loginApi } from '#/api';
+import { transformUserInfo } from '#/api/core/user';
 import { $t } from '#/locales';
-
-import { useDictStore } from './dict';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
@@ -28,34 +23,37 @@ export const useAuthStore = defineStore('auth', () => {
   const loginLoading = ref(false);
 
   /**
-   * 异步处理登录操作
-   * Asynchronously handle the login process
-   * @param params 登录表单数据
+   * Login handler
    */
   async function authLogin(
     params: LoginAndRegisterParams,
     onSuccess?: () => Promise<void> | void,
   ) {
-    // 异步处理用户登录操作并获取 accessToken
     let userInfo: null | UserInfo = null;
     try {
       loginLoading.value = true;
-      const { access_token } = await loginApi(params);
 
-      // 将 accessToken 存储到 accessStore 中
-      accessStore.setAccessToken(access_token);
-      accessStore.setRefreshToken(access_token);
+      // Call GoFrame login API
+      const loginResult = await loginApi({
+        username: params.username,
+        password: params.password,
+      });
 
-      // 获取用户信息并存储到 accessStore 中
-      userInfo = await fetchUserInfo();
-      /**
-       * 设置用户信息
-       */
+      // Store token
+      accessStore.setAccessToken(loginResult.token);
+
+      // Store user info in localStorage for later retrieval
+      localStorage.setItem('ai-platform-user', JSON.stringify(loginResult));
+
+      // Transform and store user info
+      userInfo = transformUserInfo(loginResult);
       userStore.setUserInfo(userInfo);
-      /**
-       * 在这里设置权限
-       */
-      accessStore.setAccessCodes(userInfo.permissions);
+
+      // Set permissions
+      const permissions = loginResult.isAdmin
+        ? ['*:*:*', 'spec:manage', 'user:manage']
+        : [];
+      accessStore.setAccessCodes(permissions);
 
       if (accessStore.loginExpired) {
         accessStore.setLoginExpired(false);
@@ -81,25 +79,18 @@ export const useAuthStore = defineStore('auth', () => {
     };
   }
 
+  /**
+   * Logout handler
+   */
   async function logout(redirect: boolean = true) {
     try {
-      // 这两个接口不依赖 不需要await sseClose
-      await Promise.all([seeConnectionClose(), doLogout()]);
+      await doLogout();
     } catch (error) {
       console.error(error);
-      /**
-       * 这两个接口按正常逻辑不可能返回401
-       * 在微服务版本配置错误的情况下 这里会抛出401
-       * 在这里抛出自定义异常供上层处理
-       */
-      if (error instanceof UnauthorizedException) {
-        throw new ImpossibleReturn401Exception(error.message);
-      }
     } finally {
       resetAllStores();
       accessStore.setLoginExpired(false);
 
-      // 回登陆页带上当前路由地址
       await router.replace({
         path: LOGIN_PATH,
         query: redirect
@@ -111,34 +102,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Fetch user info from localStorage
+   */
   async function fetchUserInfo() {
-    const backUserInfo = await getUserInfoApi();
-    /**
-     * 登录超时的情况
-     */
-    if (!backUserInfo) {
-      throw new Error('获取用户信息失败.');
+    const result = await getUserInfoApi();
+    if (!result) {
+      throw new Error('Failed to get user info.');
     }
-    const { permissions = [], roles = [], user } = backUserInfo;
-    /**
-     * 从后台user -> vben user转换
-     */
-    const userInfo: UserInfo = {
-      avatar: user.avatar ?? '',
-      permissions,
-      realName: user.nickName,
-      roles,
-      userId: user.userId,
-      username: user.userName,
-      email: user.email ?? '',
-    };
+    const { permissions = [], roles = [], user } = result;
+
+    const userInfo: UserInfo = transformUserInfo(user);
+    userInfo.permissions = permissions;
+    userInfo.roles = roles;
+
     userStore.setUserInfo(userInfo);
-    /**
-     * 需要重新加载字典
-     * 比如退出登录切换到其他租户
-     */
-    const dictStore = useDictStore();
-    dictStore.resetCache();
+    accessStore.setAccessCodes(permissions);
     return userInfo;
   }
 
