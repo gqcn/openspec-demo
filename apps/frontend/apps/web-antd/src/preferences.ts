@@ -11,9 +11,10 @@ export const overridesPreferences = defineOverridesPreferences({
     name: import.meta.env.VITE_APP_TITLE,
   },
   copyright: {
-    companyName: '',
+    companyName: 'vben',
     companySiteLink: '',
-    enable: false,
+    date: `${new Date().getFullYear()}`,
+    enable: true,
   },
   footer: {
     enable: false,

@@ -35,14 +35,17 @@ withDefaults(defineProps<Props>(), {
     <!-- Copyright Text -->
     Copyright © {{ date }}
 
-    <!-- Company Link -->
+    <!-- Company Name -->
     <a
-      v-if="companyName"
-      :href="companySiteLink || 'javascript:void(0)'"
+      v-if="companyName && companySiteLink"
+      :href="companySiteLink"
       class="hover:text-primary-hover mx-1"
       target="_blank"
     >
       {{ companyName }}
     </a>
+    <span v-else-if="companyName" class="mx-1">
+      {{ companyName }}
+    </span>
   </div>
 </template>

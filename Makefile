@@ -1,15 +1,31 @@
-.PHONY: kind-setup kind-teardown kind-status k8s-load k8s-preload dev stop status test
+.PHONY: kind-setup kind-teardown kind-status k8s-load k8s-preload dev stop status test up
 
 CLUSTER_NAME  := kind-cluster
 NAMESPACE     := jupyter
-BACKEND_DIR   := backend
-FRONTEND_DIR  := frontend
+BACKEND_DIR   := apps/backend
+FRONTEND_DIR  := apps/frontend
 BACKEND_BIN   := $(BACKEND_DIR)/bin/platform
 PID_DIR       := /tmp/platform-pids
 BACKEND_PID   := $(PID_DIR)/backend.pid
 FRONTEND_PID  := $(PID_DIR)/frontend.pid
 FRONTEND_PORT := 3002
 BACKEND_PORT  := 8080
+
+
+up:
+	@if git diff --quiet HEAD && git diff --cached --quiet && [ -z "$$(git ls-files --others --exclude-standard)" ]; then \
+		echo "没有需要提交的改动"; \
+		exit 0; \
+	fi
+	@git add -A
+	@echo "正在通过 AI 分析改动并生成 commit message..."
+	@MSG=$$(git diff --cached --stat && echo "---" && git diff --cached | head -2000 | \
+		claude -p "分析以上 git diff，生成一个简洁的英文 commit message（一行，不超过72字符，不要加引号，不要加前缀如 feat:/fix: 等）。只输出 commit message 本身，不要有其他内容。" 2>/dev/null) && \
+	COMMIT_MSG=$$(echo "$$MSG" | tail -1) && \
+	echo "Commit: $$COMMIT_MSG" && \
+	git commit -m "$$COMMIT_MSG" && \
+	git push origin
+
 
 ## dev: 启动前后端开发服务器，并打印访问地址
 dev:
