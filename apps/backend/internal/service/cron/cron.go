@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcron"
 	"github.com/gogf/gf/v2/os/gtime"
@@ -130,7 +131,7 @@ func (s *Service) processInstance(ctx context.Context, ins *entity.Instance, idl
 	} else {
 		// Active – reset idle_since
 		if ins.IdleSince != nil {
-			_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(g.Map{cols.IdleSince: nil}).Update()
+			_, _ = dao.Instances.Ctx(ctx).Where(cols.Id, ins.Id).Data(do.Instance{IdleSince: gdb.Raw("NULL")}).Update()
 		}
 	}
 }

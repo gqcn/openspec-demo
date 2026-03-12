@@ -17,6 +17,23 @@ license: Apache-2.0
 - Before creating new methods or variables, check if they already exist elsewhere and reuse existing implementations.
 - Use the `gerror` component for all error handling to ensure complete stack traces for traceability.
 - When exploring new components, prioritize GoFrame built-in components and reference best practice code from examples.
+- **Database Operations MUST use DO objects** (`internal/model/do/`), never `g.Map` or `map[string]interface{}`. DO struct fields are `interface{}`; unset fields remain `nil` and are automatically ignored by the ORM:
+  ```go
+  // Good - use DO object
+  dao.Users.Ctx(ctx).Where(cols.Id, id).Data(do.User{Uid: uid}).Update()
+
+  // Good - conditional fields, unset fields are nil and ignored
+  data := do.User{}
+  if password != "" { data.PasswordHash = hash }
+  if isAdmin != nil { data.IsAdmin = *isAdmin }
+  dao.Users.Ctx(ctx).Where(cols.Id, id).Data(data).Update()
+
+  // Good - explicitly set a column to NULL using gdb.Raw
+  dao.Instances.Ctx(ctx).Where(cols.Id, id).Data(do.Instance{IdleSince: gdb.Raw("NULL")}).Update()
+
+  // Bad - never use g.Map for database operations
+  dao.Users.Ctx(ctx).Data(g.Map{cols.Uid: uid}).Update()
+  ```
 
 ## Code Style Standards
 - **Variable Declarations**: When defining multiple variables, use a `var` block to group them for better alignment and readability:

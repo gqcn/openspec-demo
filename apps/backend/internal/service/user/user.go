@@ -8,7 +8,6 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gcode"
 	"github.com/gogf/gf/v2/errors/gerror"
-	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gqcn/platform/backend/internal/consts"
 	"github.com/gqcn/platform/backend/internal/dao"
 	"github.com/gqcn/platform/backend/internal/model/do"
@@ -75,7 +74,7 @@ func (s *Service) Create(ctx context.Context, username, password, email string, 
 		uid = id + consts.UIDOffset
 
 		// Update uid field (uid = 10000 + id) in the same transaction
-		_, e = dao.Users.Ctx(ctx).TX(tx).Where(cols.Id, id).Data(g.Map{cols.Uid: uid}).Update()
+		_, e = dao.Users.Ctx(ctx).TX(tx).Where(cols.Id, id).Data(do.User{Uid: uid}).Update()
 		return e
 	})
 	return
@@ -103,18 +102,21 @@ func (s *Service) UpdateStatus(ctx context.Context, id, status uint) error {
 // Update modifies a user's role and/or password.
 func (s *Service) Update(ctx context.Context, id uint, password string, isAdmin *uint) error {
 	cols := dao.Users.Columns()
-	data := g.Map{}
+	data := do.User{}
+	hasField := false
 	if password != "" {
 		hash, err := s.authSvc.HashPassword(password)
 		if err != nil {
 			return err
 		}
-		data[cols.PasswordHash] = hash
+		data.PasswordHash = hash
+		hasField = true
 	}
 	if isAdmin != nil {
-		data[cols.IsAdmin] = *isAdmin
+		data.IsAdmin = *isAdmin
+		hasField = true
 	}
-	if len(data) == 0 {
+	if !hasField {
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "未提供任何修改字段")
 	}
 	_, err := dao.Users.Ctx(ctx).Where(cols.Id, id).Data(data).Update()
@@ -152,18 +154,21 @@ func (s *Service) Delete(ctx context.Context, id uint) error {
 // UpdateProfile updates the current user's email and/or password.
 func (s *Service) UpdateProfile(ctx context.Context, userId uint, email, password string) error {
 	cols := dao.Users.Columns()
-	data := g.Map{}
+	data := do.User{}
+	hasField := false
 	if email != "" {
-		data[cols.Email] = email
+		data.Email = email
+		hasField = true
 	}
 	if password != "" {
 		hash, err := s.authSvc.HashPassword(password)
 		if err != nil {
 			return err
 		}
-		data[cols.PasswordHash] = hash
+		data.PasswordHash = hash
+		hasField = true
 	}
-	if len(data) == 0 {
+	if !hasField {
 		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "未提供任何修改字段")
 	}
 	_, err := dao.Users.Ctx(ctx).Where(cols.Id, userId).Data(data).Update()
