@@ -71,3 +71,28 @@ type DeleteReq struct {
 
 // DeleteRes defines the delete user response.
 type DeleteRes struct{}
+
+// UpdateProfileReq defines the update current user's profile request.
+type UpdateProfileReq struct {
+	g.Meta   `path:"/profile" method:"put" tags:"User" summary:"修改个人信息"`
+	Email    string `json:"email"    v:"email#邮箱格式不正确"`
+	Password string `json:"password" v:"min-length:8#密码至少8位"`
+}
+
+// UpdateProfileRes defines the update profile response.
+type UpdateProfileRes struct{}
+
+// GetProfileReq defines the get current user's profile request.
+type GetProfileReq struct {
+	g.Meta `path:"/profile" method:"get" tags:"User" summary:"获取个人信息"`
+}
+
+// GetProfileRes defines the get profile response.
+type GetProfileRes struct {
+	Id       uint   `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	IsAdmin  uint   `json:"isAdmin"`
+	Uid      uint   `json:"uid"`
+}
+

@@ -325,6 +325,16 @@
   - 修复：新增 `backend/internal/service/k8s/informer.go` 实现 Pod Informer，监听 `jupyter` namespace 下 Pod 事件(Add/Update/Delete)，根据 Pod Phase 和 ContainerStatus 计算状态并自动更新 DB 中 instance 的 status/pod_ip/node_name；修改 `backend/internal/cmd/cmd.go` 在应用启动时调用 `svcK8s.StartPodInformer(ctx)` 启动 Informer
   - 测试：TC0020a~TC0020b（手动删除 Pod 后 DB 状态自动更新为 failed + 前端列表显示"异常"状态）
   - 验证：手动测试通过 — 创建 Pod 后 DB 状态自动从 creating 更新为 running（含 pod_ip/node_name），删除 Pod 后自动更新为 stopped，延迟 1-2 秒，Informer 日志正常
+- [x] **FB-35**：用户无法修改自己的个人信息（邮箱、密码），需要新增用户自助修改个人信息功能
+  - 修复：后端新增 `PUT /api/profile` 接口（`user_v1_update_profile.go`），从 JWT 获取当前用户 ID，调用 `userSvc.UpdateProfile()` 更新邮箱和/或密码（密码需 bcrypt 哈希）；前端在 `basic.vue` 用户下拉菜单添加"个人信息"入口，新增 `/profile` 路由和 `profile/index.vue` 页面，使用 Vben 表单系统展示用户名（只读）、邮箱（可编辑）、新密码和确认密码字段，提交时调用 `updateProfile` API
+  - 测试：TC0022a~TC0022c（导航到个人信息页面 + 表单正确显示 + 提交更新成功）
+- [x] **FB-36**：点击右上角个人头像下拉菜单中的"个人信息"无法跳转，需改用 Vue Router 导航替代 window.location.href
+- [x] **FB-37**：个人信息页面邮箱无法修改、角色修改后不刷新、密码修改不生效——根因是缺少获取个人信息 API（`GET /api/profile`），导致前端无法从后端获取最新数据
+  - 修复：后端新增 `GET /api/profile` 接口返回用户完整信息；前端页面加载时调用该接口获取数据，更新成功后刷新数据
+  - 测试：TC0022a~TC0022i（邮箱更新成功、密码更新成功、邮箱格式校验、密码长度校验、密码一致性校验、角色显示）
+- [x] **FB-38**：个人信息页面邮箱输入缺少格式校验（前端表单 rules 语法需修正）
+  - 修复：使用 Zod schema `z.string().email().or(z.literal(''))` 进行邮箱格式校验
+  - 测试：TC0022e（无效邮箱格式显示错误提示）
 
 ---
 

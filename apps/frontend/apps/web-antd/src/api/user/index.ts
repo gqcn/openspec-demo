@@ -15,6 +15,14 @@ export interface CreateUserReq {
   isAdmin: number;
 }
 
+export interface Profile {
+  id: number;
+  username: string;
+  email: string;
+  isAdmin: number;
+  uid: number;
+}
+
 /**
  * Get user list with pagination
  */
@@ -53,3 +61,18 @@ export function userStatusChange(id: number, status: number) {
 export function userDelete(id: number) {
   return requestClient.delete(`/user/${id}`);
 }
+
+/**
+ * Get current user's profile
+ */
+export async function getProfile() {
+  return requestClient.get<Profile>('/profile');
+}
+
+/**
+ * Update current user's profile (email and/or password)
+ */
+export function updateProfile(data: { email?: string; password?: string }) {
+  return requestClient.put('/profile', data);
+}
+

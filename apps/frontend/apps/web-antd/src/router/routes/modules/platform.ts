@@ -33,6 +33,16 @@ const routes: RouteRecordRaw[] = [
     path: '/users',
     component: () => import('#/views/user/index.vue'),
   },
+  {
+    meta: {
+      hideInMenu: true,
+      title: '个人信息',
+    },
+    name: 'Profile',
+    path: '/profile',
+    component: () => import('#/views/profile/index.vue'),
+  },
 ];
 
 export default routes;
+

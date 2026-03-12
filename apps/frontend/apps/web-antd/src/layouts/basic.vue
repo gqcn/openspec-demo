@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
 import { useWatermark } from '@vben/hooks';
@@ -16,12 +17,20 @@ import { resetRoutes } from '#/router';
 import { useAuthStore } from '#/store';
 import LoginForm from '#/views/_core/authentication/login.vue';
 
+const router = useRouter();
 const userStore = useUserStore();
 const authStore = useAuthStore();
 const accessStore = useAccessStore();
 const { destroyWatermark, updateWatermark } = useWatermark();
 
-const menus = computed(() => []);
+const menus = computed(() => [
+  {
+    text: '个人信息',
+    handler: () => {
+      router.push('/profile');
+    },
+  },
+]);
 
 const avatar = computed(() => {
   return userStore.userInfo?.avatar || preferences.app.defaultAvatar;

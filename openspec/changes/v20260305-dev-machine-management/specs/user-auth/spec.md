@@ -158,3 +158,30 @@ The admin SHALL be able to delete a user via `DELETE /api/user/{id}`. Deletion i
 #### Scenario: Deleted user cannot log in
 - **WHEN** a soft-deleted user attempts to log in
 - **THEN** the system returns an error (user not found or account disabled)
+
+### Requirement: User can update their own profile
+The system SHALL provide a self-service profile editing feature that allows regular users to update their own email and password. Users SHALL NOT be able to modify their username, UID, role (isAdmin), or status through this interface. The system SHALL provide a `PUT /api/profile` endpoint that accepts the current user's JWT and updates only the authenticated user's record.
+
+#### Scenario: User updates their own email
+- **WHEN** a logged-in user submits `PUT /api/profile` with `{"email": "newemail@example.com"}`
+- **THEN** the system updates the email field for the authenticated user and returns success
+
+#### Scenario: User updates their own password
+- **WHEN** a logged-in user submits `PUT /api/profile` with `{"password": "newpassword123"}`
+- **THEN** the system bcrypt-hashes the new password, updates the user record, and returns success
+
+#### Scenario: User updates both email and password
+- **WHEN** a logged-in user submits `PUT /api/profile` with both email and password fields
+- **THEN** the system updates both fields atomically and returns success
+
+#### Scenario: Frontend provides profile editing UI
+- **WHEN** a logged-in user clicks on their username dropdown in the header
+- **THEN** a "个人信息" menu item is displayed; clicking it opens a profile editing dialog or page
+
+#### Scenario: Profile form shows current values
+- **WHEN** the profile editing UI opens
+- **THEN** the form displays the current user's username (read-only), email (editable), and a password field (empty, optional)
+
+#### Scenario: Profile form validation
+- **WHEN** user submits the profile form with an invalid email format
+- **THEN** the frontend displays a validation error and does not call the API

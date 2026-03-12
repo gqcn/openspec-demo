@@ -148,3 +148,25 @@ func (s *Service) Delete(ctx context.Context, id uint) error {
 	_, err = dao.Users.Ctx(ctx).Where(cols.Id, id).Delete()
 	return err
 }
+
+// UpdateProfile updates the current user's email and/or password.
+func (s *Service) UpdateProfile(ctx context.Context, userId uint, email, password string) error {
+	cols := dao.Users.Columns()
+	data := g.Map{}
+	if email != "" {
+		data[cols.Email] = email
+	}
+	if password != "" {
+		hash, err := s.authSvc.HashPassword(password)
+		if err != nil {
+			return err
+		}
+		data[cols.PasswordHash] = hash
+	}
+	if len(data) == 0 {
+		return gerror.NewCode(gcode.CodeBusinessValidationFailed, "未提供任何修改字段")
+	}
+	_, err := dao.Users.Ctx(ctx).Where(cols.Id, userId).Data(data).Update()
+	return err
+}
+
