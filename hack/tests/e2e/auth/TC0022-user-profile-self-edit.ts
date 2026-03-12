@@ -48,9 +48,12 @@ test.describe('TC0022 - User Profile Self-Edit', () => {
     // Check email info section
     await expect(adminPage.locator('text=邮箱：')).toBeVisible();
 
-    // Check role is displayed (admin user should have 'admin' role)
+    // Check role is displayed in Chinese (admin user should show '管理员')
     await expect(adminPage.locator('text=角色：')).toBeVisible();
-    await expect(adminPage.locator('.bg-blue-50.text-blue-600:has-text("admin")')).toBeVisible();
+    await expect(adminPage.locator('.bg-blue-50.text-blue-600:has-text("管理员")')).toBeVisible();
+
+    // Check no poetry text is present
+    await expect(adminPage.locator('text=领略盛夏日的光')).not.toBeVisible();
   });
 
   test('TC0022d - Can update email and see updated value in left panel', async ({ adminPage }) => {

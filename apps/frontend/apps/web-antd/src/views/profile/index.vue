@@ -80,7 +80,7 @@ const username = computed(() => profileData.value?.username || userStore.userInf
 const email = computed(() => profileData.value?.email || '');
 const roles = computed(() => {
   const isAdmin = profileData.value?.isAdmin ?? (userStore.userInfo?.roles?.includes('admin') ? 1 : 0);
-  return isAdmin === 1 ? ['admin'] : ['user'];
+  return isAdmin === 1 ? ['管理员'] : ['普通用户'];
 });
 
 // Fetch profile data from backend
@@ -164,12 +164,7 @@ async function handleSecuritySubmit() {
         </Avatar>
 
         <!-- 用户名 -->
-        <div class="text-xl font-semibold mb-2">{{ username }}</div>
-
-        <!-- 描述 -->
-        <div class="text-gray-500 text-sm mb-6 text-center">
-          领略盛夏日的光，半入江风半入云。
-        </div>
+        <div class="text-xl font-semibold mb-6">{{ username }}</div>
 
         <!-- 用户信息列表 -->
         <div class="w-full space-y-3 text-sm">
