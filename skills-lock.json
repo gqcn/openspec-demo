@@ -1,11 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "e2e-testing": {
-      "source": "affaan-m/everything-claude-code",
-      "sourceType": "github",
-      "computedHash": "b66c5a5415f07b48472049d5301e8327fe39cb23b706f7969668a2d823f62d11"
-    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
