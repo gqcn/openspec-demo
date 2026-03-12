@@ -109,4 +109,17 @@ export class NotebookPage {
     const body = await this.page.evaluate(() => document.body.innerText)
     return body.includes(text)
   }
+
+  /** Get the status of the first notebook in the list. */
+  async getNotebookStatus(): Promise<string> {
+    return await this.page.evaluate(async () => {
+      const token = localStorage.getItem('token') || ''
+      const r = await fetch('/api/notebook', {
+        headers: { Authorization: 'Bearer ' + token },
+      })
+      const d = await r.json()
+      const list: Array<{ status: string }> = d.data?.list ?? []
+      return list[0]?.status ?? ''
+    })
+  }
 }

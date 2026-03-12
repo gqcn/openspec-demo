@@ -321,6 +321,10 @@
 - [x] **FB-33**：规格管理中 CPU 单位为 Cores、内存单位为 Gi：前端表格列标题加单位标注，表单输入仅接受数字（内存支持 1 位小数），DB 只存纯数字不含单位，后端创建 Pod 时拼接 "Gi" 后缀
   - 修复：前端 `spec/data.ts` 列标题改为 `CPU (Cores)` / `内存 (Gi)`，memory 表单改为 `InputNumber`（min=0.1, step=0.1, precision=1）；`spec-drawer.vue` 编辑时去掉旧数据 "Gi" 后缀、提交时转 string；`notebook/create-modal.vue` 展示加单位；后端 `notebook.go` 新增 `memoryWithUnit()` 函数，创建 Pod 时拼接 "Gi"（兼容旧数据）；`init.sql` 注释更新
   - 测试：TC0021f~TC0021h（列标题单位展示 + 内存 InputNumber 组件）
+- [x] **FB-34**：开发机列表API未实时同步K8s Pod状态,导致页面显示状态与实际K8s状态不一致;使用K8S Informer机制在后台监听Pod状态变化并自动更新DB,替代当前仅依赖创建轮询和定时任务的方式
+  - 修复：新增 `backend/internal/service/k8s/informer.go` 实现 Pod Informer，监听 `jupyter` namespace 下 Pod 事件(Add/Update/Delete)，根据 Pod Phase 和 ContainerStatus 计算状态并自动更新 DB 中 instance 的 status/pod_ip/node_name；修改 `backend/internal/cmd/cmd.go` 在应用启动时调用 `svcK8s.StartPodInformer(ctx)` 启动 Informer
+  - 测试：TC0020a~TC0020b（手动删除 Pod 后 DB 状态自动更新为 failed + 前端列表显示"异常"状态）
+  - 验证：手动测试通过 — 创建 Pod 后 DB 状态自动从 creating 更新为 running（含 pod_ip/node_name），删除 Pod 后自动更新为 stopped，延迟 1-2 秒，Informer 日志正常
 
 ---
 

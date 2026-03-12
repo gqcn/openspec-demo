@@ -16,7 +16,7 @@ license: MIT
 compatibility: Requires openspec CLI.
 metadata:
   author: gqcn
-  version: "2.0"
+  version: "1.0"
 ---
 
 # Feedback: Structured Fix, Verification & Test Coverage Loop

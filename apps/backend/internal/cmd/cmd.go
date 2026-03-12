@@ -16,6 +16,7 @@ import (
 	"github.com/gqcn/platform/backend/internal/service/bizctx"
 	"github.com/gqcn/platform/backend/internal/service/cron"
 	"github.com/gqcn/platform/backend/internal/service/image"
+	svcK8s "github.com/gqcn/platform/backend/internal/service/k8s"
 	"github.com/gqcn/platform/backend/internal/service/middleware"
 	"github.com/gqcn/platform/backend/internal/service/notebook"
 	"github.com/gqcn/platform/backend/internal/service/spec"
@@ -62,6 +63,9 @@ func run(ctx context.Context, _ *gcmd.Parser) error {
 
 	// 启动闲置检测定时任务
 	cronSvc.StartIdleChecker(ctx)
+
+	// 启动 K8S Pod Informer，实时同步 Pod 状态到 DB
+	go svcK8s.StartPodInformer(ctx)
 
 	s.Run()
 	return nil
