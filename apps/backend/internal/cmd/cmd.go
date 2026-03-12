@@ -37,9 +37,10 @@ func run(ctx context.Context, _ *gcmd.Parser) error {
 	imageSvc := image.New()
 	specSvc := spec.New()
 	userSvc := user.New(authSvc)
-	notebookSvc := notebook.New(specSvc, imageSvc)
+	k8sSvc := svcK8s.New()
+	notebookSvc := notebook.New(specSvc, imageSvc, k8sSvc)
 	middlewareSvc := middleware.New(authSvc, bizCtxSvc)
-	cronSvc := cron.New()
+	cronSvc := cron.New(k8sSvc)
 
 	s := g.Server()
 
@@ -65,7 +66,7 @@ func run(ctx context.Context, _ *gcmd.Parser) error {
 	cronSvc.StartIdleChecker(ctx)
 
 	// 启动 K8S Pod Informer，实时同步 Pod 状态到 DB
-	go svcK8s.StartPodInformer(ctx)
+	go k8sSvc.StartPodInformer(ctx)
 
 	s.Run()
 	return nil

@@ -1,4 +1,4 @@
-// Package k8s provides a singleton Kubernetes client and wraps common operations.
+// Package k8s provides Kubernetes client management and operations.
 package k8s
 
 import (
@@ -16,9 +16,17 @@ var (
 	clientset  *kubernetes.Clientset
 )
 
+// Service provides Kubernetes operations with proper dependency injection.
+type Service struct{}
+
+// New creates and returns a new Service instance.
+func New() *Service {
+	return &Service{}
+}
+
 // Client returns a shared kubernetes.Clientset, initialised on first call.
 // It first tries in-cluster config, then falls back to the kubeconfig path in config.yaml.
-func Client(ctx context.Context) *kubernetes.Clientset {
+func (s *Service) Client(ctx context.Context) *kubernetes.Clientset {
 	clientOnce.Do(func() {
 		var cfg *rest.Config
 		var err error
@@ -44,6 +52,6 @@ func Client(ctx context.Context) *kubernetes.Clientset {
 }
 
 // Namespace returns the configured K8S namespace.
-func Namespace(ctx context.Context) string {
+func (s *Service) Namespace(ctx context.Context) string {
 	return g.Cfg().MustGet(ctx, "kubernetes.namespace", "jupyter").String()
 }

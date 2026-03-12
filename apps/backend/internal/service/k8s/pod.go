@@ -29,8 +29,8 @@ type PodOptions struct {
 }
 
 // CreatePod creates a JupyterLab Pod in the configured namespace.
-func CreatePod(ctx context.Context, opts PodOptions) error {
-	ns := Namespace(ctx)
+func (s *Service) CreatePod(ctx context.Context, opts PodOptions) error {
+	ns := s.Namespace(ctx)
 	podName := consts.PodNamePrefix + opts.Username
 	baseURL := fmt.Sprintf("/jupyter/%s/", opts.Token)
 
@@ -188,7 +188,7 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 		},
 	}
 
-	_, err := Client(ctx).CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
+	_, err := s.Client(ctx).CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		g.Log().Errorf(ctx, "k8s CreatePod %s error: %v", podName, err)
 	}
@@ -196,11 +196,11 @@ func CreatePod(ctx context.Context, opts PodOptions) error {
 }
 
 // DeletePod deletes the JupyterLab Pod for the given username.
-func DeletePod(ctx context.Context, username string) error {
-	ns := Namespace(ctx)
+func (s *Service) DeletePod(ctx context.Context, username string) error {
+	ns := s.Namespace(ctx)
 	podName := consts.PodNamePrefix + username
 	gracePeriod := int64(0)
-	return Client(ctx).CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{
+	return s.Client(ctx).CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
 	})
 }
@@ -208,10 +208,10 @@ func DeletePod(ctx context.Context, username string) error {
 // GetPodStatus returns the current phase and pod IP.
 // The phase is reported as "Running" only when all containers have passed their
 // readiness probes (i.e., the pod is fully available, not just in Running phase).
-func GetPodStatus(ctx context.Context, username string) (phase string, podIP string, nodeName string, err error) {
-	ns := Namespace(ctx)
+func (s *Service) GetPodStatus(ctx context.Context, username string) (phase string, podIP string, nodeName string, err error) {
+	ns := s.Namespace(ctx)
 	podName := consts.PodNamePrefix + username
-	pod, err := Client(ctx).CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+	pod, err := s.Client(ctx).CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", "", err
 	}

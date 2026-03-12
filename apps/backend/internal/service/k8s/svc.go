@@ -12,8 +12,8 @@ import (
 )
 
 // CreateService creates a ClusterIP Service for the given username's JupyterLab Pod.
-func CreateService(ctx context.Context, username string) error {
-	ns := Namespace(ctx)
+func (s *Service) CreateService(ctx context.Context, username string) error {
+	ns := s.Namespace(ctx)
 	svcName := consts.ServiceNamePrefix + username
 	port := int32(consts.JupyterPort)
 
@@ -43,7 +43,7 @@ func CreateService(ctx context.Context, username string) error {
 		},
 	}
 
-	_, err := Client(ctx).CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+	_, err := s.Client(ctx).CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
 	if err != nil {
 		g.Log().Errorf(ctx, "k8s CreateService %s error: %v", svcName, err)
 	}
@@ -51,13 +51,13 @@ func CreateService(ctx context.Context, username string) error {
 }
 
 // DeleteService deletes the ClusterIP Service for the given username.
-func DeleteService(ctx context.Context, username string) error {
-	ns := Namespace(ctx)
+func (s *Service) DeleteService(ctx context.Context, username string) error {
+	ns := s.Namespace(ctx)
 	svcName := consts.ServiceNamePrefix + username
-	return Client(ctx).CoreV1().Services(ns).Delete(ctx, svcName, metav1.DeleteOptions{})
+	return s.Client(ctx).CoreV1().Services(ns).Delete(ctx, svcName, metav1.DeleteOptions{})
 }
 
 // ServiceBackendName returns the K8S service name for the user.
-func ServiceBackendName(username string) string {
+func (s *Service) ServiceBackendName(username string) string {
 	return fmt.Sprintf("%s%s", consts.ServiceNamePrefix, username)
 }

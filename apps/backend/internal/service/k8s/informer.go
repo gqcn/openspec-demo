@@ -16,9 +16,9 @@ import (
 
 // StartPodInformer starts a K8S Informer to watch Pod events in the jupyter namespace
 // and automatically sync Pod status changes to the database.
-func StartPodInformer(ctx context.Context) {
-	ns := Namespace(ctx)
-	client := Client(ctx)
+func (s *Service) StartPodInformer(ctx context.Context) {
+	ns := s.Namespace(ctx)
+	client := s.Client(ctx)
 
 	// Create informer factory for the jupyter namespace with label selector
 	factory := informers.NewSharedInformerFactoryWithOptions(
@@ -35,19 +35,19 @@ func StartPodInformer(ctx context.Context) {
 			pod := obj.(*corev1.Pod)
 			// Only process pods with app=jupyterlab label
 			if pod.Labels["app"] == "jupyterlab" {
-				handlePodEvent(ctx, pod, "Add")
+				s.handlePodEvent(ctx, pod, "Add")
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			pod := newObj.(*corev1.Pod)
 			if pod.Labels["app"] == "jupyterlab" {
-				handlePodEvent(ctx, pod, "Update")
+				s.handlePodEvent(ctx, pod, "Update")
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*corev1.Pod)
 			if pod.Labels["app"] == "jupyterlab" {
-				handlePodEvent(ctx, pod, "Delete")
+				s.handlePodEvent(ctx, pod, "Delete")
 			}
 		},
 	})
@@ -66,7 +66,7 @@ func StartPodInformer(ctx context.Context) {
 }
 
 // handlePodEvent processes Pod events and updates the database
-func handlePodEvent(ctx context.Context, pod *corev1.Pod, eventType string) {
+func (s *Service) handlePodEvent(ctx context.Context, pod *corev1.Pod, eventType string) {
 	// Extract username from pod name (format: jupyterlab-{username})
 	podName := pod.Name
 	if len(podName) <= len(consts.PodNamePrefix) {
@@ -96,7 +96,7 @@ func handlePodEvent(ctx context.Context, pod *corev1.Pod, eventType string) {
 	}
 
 	// Calculate status from Pod phase and container readiness
-	status := calculatePodStatus(pod)
+	status := s.calculatePodStatus(pod)
 	podIP := pod.Status.PodIP
 	nodeName := pod.Spec.NodeName
 
@@ -116,7 +116,7 @@ func handlePodEvent(ctx context.Context, pod *corev1.Pod, eventType string) {
 }
 
 // calculatePodStatus determines the instance status based on Pod phase and container readiness
-func calculatePodStatus(pod *corev1.Pod) string {
+func (s *Service) calculatePodStatus(pod *corev1.Pod) string {
 	phase := string(pod.Status.Phase)
 
 	switch phase {

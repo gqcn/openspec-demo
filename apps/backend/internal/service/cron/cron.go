@@ -20,11 +20,13 @@ import (
 )
 
 // Service provides scheduled task management.
-type Service struct{}
+type Service struct {
+	k8sSvc *svcK8s.Service
+}
 
 // New creates and returns a new Service instance.
-func New() *Service {
-	return &Service{}
+func New(k8sSvc *svcK8s.Service) *Service {
+	return &Service{k8sSvc: k8sSvc}
 }
 
 // StartIdleChecker registers the cron job that checks for idle JupyterLab instances.
@@ -152,9 +154,9 @@ func (s *Service) handleFailure(ctx context.Context, ins *entity.Instance) {
 
 func (s *Service) reclaimInstance(ctx context.Context, ins *entity.Instance) {
 	// Delete K8S resources
-	_ = svcK8s.DeleteIngress(ctx, ins.Token)
-	_ = svcK8s.DeleteService(ctx, ins.Username)
-	_ = svcK8s.DeletePod(ctx, ins.Username)
+	_ = s.k8sSvc.DeleteIngress(ctx, ins.Token)
+	_ = s.k8sSvc.DeleteService(ctx, ins.Username)
+	_ = s.k8sSvc.DeletePod(ctx, ins.Username)
 
 	cols := dao.Instances.Columns()
 	now := gtime.Now()

@@ -18,6 +18,25 @@ license: Apache-2.0
 - Use the `gerror` component for all error handling to ensure complete stack traces for traceability.
 - When exploring new components, prioritize GoFrame built-in components and reference best practice code from examples.
 
+## Code Style Standards
+- **Variable Declarations**: When defining multiple variables, use a `var` block to group them for better alignment and readability:
+  ```go
+  // Good - aligned and clean
+  var (
+      authSvc       *auth.Service
+      bizCtxSvc     *bizctx.Service
+      k8sSvc        *svcK8s.Service
+      notebookSvc   *notebook.Service
+      middlewareSvc *middleware.Service
+  )
+
+  // Avoid - scattered declarations
+  authSvc := auth.New()
+  bizCtxSvc := bizctx.New()
+  k8sSvc := svcK8s.New()
+  ```
+- Apply this pattern when you have 3 or more related variable declarations in the same scope.
+
 # GoFrame Documentation
 Complete GoFrame development resources covering component design, usage, best practices, and considerations: [GoFrame Documentation](./references/README.MD)
 

@@ -25,11 +25,16 @@ import (
 type Service struct {
 	specSvc  *spec.Service
 	imageSvc *image.Service
+	k8sSvc   *svcK8s.Service
 }
 
 // New creates and returns a new Service instance.
-func New(specSvc *spec.Service, imageSvc *image.Service) *Service {
-	return &Service{specSvc: specSvc, imageSvc: imageSvc}
+func New(specSvc *spec.Service, imageSvc *image.Service, k8sSvc *svcK8s.Service) *Service {
+	return &Service{
+		specSvc:  specSvc,
+		imageSvc: imageSvc,
+		k8sSvc:   k8sSvc,
+	}
 }
 
 // List returns all instances for the requesting user (or all if admin).
@@ -130,13 +135,13 @@ func (s *Service) Create(ctx context.Context, userId uint, username string, uid 
 		// the instance as failed in the DB. Called on all failure paths in this goroutine.
 		markFailed := func(reason string) {
 			g.Log().Errorf(bgCtx, "instance %d (%s) failed: %s — cleaning up K8S resources", instanceId, username, reason)
-			_ = svcK8s.DeleteIngress(bgCtx, token)
-			_ = svcK8s.DeleteService(bgCtx, username)
-			_ = svcK8s.DeletePod(bgCtx, username)
+			_ = s.k8sSvc.DeleteIngress(bgCtx, token)
+			_ = s.k8sSvc.DeleteService(bgCtx, username)
+			_ = s.k8sSvc.DeletePod(bgCtx, username)
 			_, _ = dao.Instances.Ctx(bgCtx).Where(cols.Id, instanceId).Data(do.Instance{Status: consts.StatusFailed}).Update()
 		}
 
-		if e := svcK8s.CreatePod(bgCtx, svcK8s.PodOptions{
+		if e := s.k8sSvc.CreatePod(bgCtx, svcK8s.PodOptions{
 			Username:     username,
 			Uid:          uid,
 			Token:        token,
@@ -152,14 +157,14 @@ func (s *Service) Create(ctx context.Context, userId uint, username string, uid 
 			markFailed(fmt.Sprintf("CreatePod error: %v", e))
 			return
 		}
-		_ = svcK8s.CreateService(bgCtx, username)
-		_ = svcK8s.CreateIngress(bgCtx, username, token)
+		_ = s.k8sSvc.CreateService(bgCtx, username)
+		_ = s.k8sSvc.CreateIngress(bgCtx, username, token)
 
 		// Poll until Pod is Running (max 5 min)
 		deadline := time.Now().Add(5 * time.Minute)
 		for time.Now().Before(deadline) {
 			time.Sleep(5 * time.Second)
-			phase, podIP, nodeName, e := svcK8s.GetPodStatus(bgCtx, username)
+			phase, podIP, nodeName, e := s.k8sSvc.GetPodStatus(bgCtx, username)
 			if e != nil {
 				continue
 			}
@@ -204,9 +209,9 @@ func (s *Service) Delete(ctx context.Context, id, userId uint, isAdmin uint) err
 	// or Service/Ingress created before the failure). Attempt best-effort cleanup to
 	// prevent orphaned resources from persisting in the cluster.
 	if ins.Status == consts.StatusFailed {
-		_ = svcK8s.DeleteIngress(ctx, ins.Token)
-		_ = svcK8s.DeleteService(ctx, ins.Username)
-		_ = svcK8s.DeletePod(ctx, ins.Username)
+		_ = s.k8sSvc.DeleteIngress(ctx, ins.Token)
+		_ = s.k8sSvc.DeleteService(ctx, ins.Username)
+		_ = s.k8sSvc.DeletePod(ctx, ins.Username)
 		_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Delete()
 		return err
 	}
@@ -218,9 +223,9 @@ func (s *Service) Delete(ctx context.Context, id, userId uint, isAdmin uint) err
 	}
 
 	// Delete K8S resources
-	_ = svcK8s.DeleteIngress(ctx, ins.Token)
-	_ = svcK8s.DeleteService(ctx, ins.Username)
-	_ = svcK8s.DeletePod(ctx, ins.Username)
+	_ = s.k8sSvc.DeleteIngress(ctx, ins.Token)
+	_ = s.k8sSvc.DeleteService(ctx, ins.Username)
+	_ = s.k8sSvc.DeletePod(ctx, ins.Username)
 
 	// Mark as stopped
 	now := gtime.Now()
@@ -243,7 +248,7 @@ func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) er
 
 	cols := dao.Instances.Columns()
 	// Delete old Pod (Service + Ingress stay)
-	_ = svcK8s.DeletePod(ctx, ins.Username)
+	_ = s.k8sSvc.DeletePod(ctx, ins.Username)
 
 	// Mark creating
 	_, err = dao.Instances.Ctx(ctx).Where(cols.Id, id).Data(do.Instance{
@@ -270,7 +275,7 @@ func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) er
 
 	go func() {
 		bgCtx := context.Background()
-		if e := svcK8s.CreatePod(bgCtx, svcK8s.PodOptions{
+		if e := s.k8sSvc.CreatePod(bgCtx, svcK8s.PodOptions{
 			Username:     ins.Username,
 			Uid:          uid,
 			Token:        ins.Token,
@@ -289,7 +294,7 @@ func (s *Service) Restart(ctx context.Context, id, userId uint, isAdmin uint) er
 		deadline := time.Now().Add(5 * time.Minute)
 		for time.Now().Before(deadline) {
 			time.Sleep(5 * time.Second)
-			phase, podIP, nodeName, e := svcK8s.GetPodStatus(bgCtx, ins.Username)
+			phase, podIP, nodeName, e := s.k8sSvc.GetPodStatus(bgCtx, ins.Username)
 			if e != nil {
 				continue
 			}
